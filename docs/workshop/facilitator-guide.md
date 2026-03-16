@@ -6,7 +6,7 @@ This guide is for the person facilitating the workshop. It describes the full se
 
 ## Workshop Overview
 
-**Purpose**: Apply Residuality Theory techniques to the NovaMesh architecture to develop a more resilient, uncertainty-aware design.
+**Purpose**: Apply Residuality Theory techniques to the NovaMesh smart door architecture to develop a more resilient, uncertainty-aware design.
 
 **Target participants**:
 - Software architects (2–4)
@@ -57,7 +57,7 @@ This guide is for the person facilitating the workshop. It describes the full se
 
 1. **Welcome and context** (5 min): Introduce the workshop goal — not to solve NovaMesh's problems, but to practice Residuality Theory techniques using it as a vehicle.
 
-2. **Brief company overview** (5 min): Walk through the NovaMesh company profile and key architectural facts. Highlight the "mid-migration" state — some things are live, some are being built, some are planned.
+2. **Brief company overview** (5 min): Walk through the NovaMesh company profile and key architectural facts. Highlight the NovaDoor product (camera + AI facial recognition + electronic lock), the subscription model, and the "mid-migration" state — some things are live, some are being built, some are planned. Point out that this is a system where architectural decisions have physical-world safety consequences (door locks).
 
 3. **Residuality Theory introduction** (10 min): Present the core concepts (stressors, residues, attractors, criticality). Use the framing from the [Residuality Theory Overview](../residuality-theory/overview.md). The key messages are:
    - We can't predict the future, but we can design systems that survive it
@@ -129,7 +129,7 @@ See [Exercise 4 — Residue Redesign](./exercises/04-residue-redesign.md) for fu
 - Push teams toward residues that address multiple stressors (high row/column intersection density in the matrix)
 - Encourage residues that acknowledge *uncertainty* — a good residue doesn't require knowing when or whether the stressor will arrive
 
-**Example residue framing**: "Instead of 'add multi-region support,' a residue might be: *a degraded-mode capability at the Hub edge that maintains core functionality without cloud connectivity for up to 72 hours.* This addresses S-ENV-01, S-ENV-02, S-TECH-07, and S-REG-03 simultaneously."
+**Example residue framing**: "Instead of 'add multi-region support,' a residue might be: *an edge-first recognition mode where the NovaDoor performs facial recognition locally and executes auto-unlock rules without requiring cloud connectivity.* This addresses S-ENV-01 (cloud region outage), S-ENV-02 (ISP outage), S-TECH-02 (Rekognition outage), and S-TECH-07 (Auth0 outage) simultaneously — and it also provides a product advantage for privacy-conscious customers (S-REG-04)."
 
 ---
 

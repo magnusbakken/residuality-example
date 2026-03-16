@@ -30,12 +30,15 @@ This document provides a detailed reference for every major component in the Nov
 - User registration, login, password reset, MFA
 - OAuth2 / OIDC token issuance (via Auth0)
 - User profile management (name, preferences, communication settings)
+- Household member management — tracks which people live at an address and own a NovaDoor
+- Face profile metadata — stores references to enrolled face embeddings (actual embeddings live in C13 / novamesh-faces-db)
 - RBAC: consumer roles (`free`, `protect`, `insights`, `premium`) and enterprise roles (`org_admin`, `site_manager`, `viewer`)
 - Session token management
 
 **Known gaps**:
 - Enterprise tenant isolation relies on `org_id` application-level filtering; no row-level security in DB
 - Profile data migration from the monolith is ~60% complete; some users still have split data
+- No explicit consent tracking for biometric face data enrollment (required for BIPA / GDPR compliance)
 
 ---
 
@@ -52,15 +55,16 @@ This document provides a detailed reference for every major component in the Nov
 | **Downstream** | Web App (legacy endpoints), Admin Portal, Metabase |
 
 **Responsibilities** (remaining, pre-migration):
-- Enterprise account management (B2B portal, enterprise billing)
+- Enterprise account and site management (B2B portal, enterprise billing, door fleet assignment)
 - Legacy subscription endpoints (dual-write target during migration)
 - Admin tooling for customer support
 - Legacy webhook handlers
+- Notification preferences (still stored here; not yet migrated to C5's own store)
 
 **Migration status**:
 - User auth: migrated to C1 (~60%)
 - Consumer subscriptions: being migrated to C6 (~30%)
-- Enterprise accounts: not started
+- Enterprise accounts and site management: not started
 - Admin tooling: not started, blocked on enterprise migration
 
 ---
@@ -73,21 +77,23 @@ This document provides a detailed reference for every major component in the Nov
 | **Status** | LIVE |
 | **Language / Runtime** | Go 1.22 |
 | **Database** | DynamoDB (device registry, state); S3 (firmware artefacts) |
-| **SLO** | 99.9% availability; OTA scheduling < 5 min delay |
+| **SLO** | 99.9% availability; OTA scheduling < 5 min delay; lock command delivery < 2s p95 |
 | **Upstream** | AWS IoT Core, AWS IoT Device Shadow, S3 |
-| **Downstream** | AI Platform, Data Platform (telemetry), Notification Service |
+| **Downstream** | AI Platform, Data Platform (visitor event telemetry), Notification Service |
 
 **Responsibilities**:
-- Device registration and provisioning
-- Device shadow / state management (online, offline, firmware version, configuration)
+- NovaDoor device registration and provisioning
+- Device shadow / state management (online, offline, firmware version, lock state, camera status)
 - OTA firmware update scheduling, delivery, and status tracking
 - Fleet management (mass update campaigns)
-- MQTT message routing from Hub devices
+- **Door lock/unlock command dispatch** — receives commands from Access Rules Engine and mobile app; delivers via MQTT to device
+- MQTT message routing from NovaDoor devices (visitor event telemetry, motion events, lock state changes)
 
 **Known gaps**:
 - DynamoDB hot-partition issue during mass OTA campaigns (> 10K simultaneous updates)
-- OTA rollback is manual; no automated rollback on failure threshold breach
-- No independent model update path for edge AI models
+- OTA rollback is manual; no automated rollback on failure threshold breach — high severity because a bad OTA can brick door lock functionality
+- No independent model update path for edge AI models (face recognition model updates require full firmware OTA)
+- No fallback command path if AWS IoT Core is unavailable; lock commands are dropped
 
 ---
 
@@ -122,19 +128,21 @@ This document provides a detailed reference for every major component in the Nov
 | **Status** | LIVE |
 | **Language / Runtime** | Node.js 20 |
 | **Database** | Redis (queue/deduplication); notification preferences: monolith DB (being migrated) |
-| **SLO** | Push: < 30s delivery p95; Email: best-effort |
+| **SLO** | Push: < 10s delivery p95; Email: best-effort |
 | **Upstream** | AWS SNS (event source), Firebase FCM, SendGrid, Twilio |
 | **Downstream** | End users (push/email/SMS) |
 
 **Responsibilities**:
+- **Visitor alert notifications**: real-time push with face recognition result (name or "Unknown visitor"), video thumbnail, and one-tap remote unlock action
 - Multi-channel notification delivery (push, email, SMS, in-app)
-- Notification preference enforcement
-- Deduplication and rate limiting of notifications
+- Notification preference enforcement (opt-in/out per channel per event type)
+- Deduplication and rate limiting of notifications (prevent alert flooding during repeated motion events)
 - Delivery status tracking
 
 **Known gaps**:
 - Notification preferences are read from two sources (monolith DB and in-memory cache); inconsistencies occur
 - No dead-letter queue for failed notifications; delivery failures are logged but not retried systematically
+- No batching strategy for high-frequency motion events — potential for alert fatigue
 
 ---
 
@@ -153,14 +161,18 @@ This document provides a detailed reference for every major component in the Nov
 **Responsibilities**:
 - Subscription lifecycle management (create, upgrade, downgrade, cancel)
 - Payment method management via Stripe
-- Subscription entitlement signals for feature gating
+- **Feature entitlement signals** — determines which AI features are available based on tier:
+  - Free: basic motion alerts, 7-day video
+  - Protect: face recognition (up to 10 faces), auto-unlock, 30-day video
+  - Insights: unlimited faces, visitor intelligence, privacy mode, 90-day video
+  - Premium: all features + 1-year video history
 - Invoice generation and billing history
 - Webhook handling from Stripe (payment succeeded, failed, subscription events)
 
 **Known gaps**:
-- Dual-write produces inconsistent states when one write succeeds and the other fails (~0.3% of operations)
+- Dual-write produces inconsistent states when one write succeeds and the other fails (~0.3% of operations), causing incorrect feature gating
 - No idempotency on Stripe webhook processing (duplicate event handling possible)
-- Enterprise billing (custom contracts, volume discounts) still in the monolith
+- Enterprise billing (custom contracts, volume discounts, multi-door pricing) still in the monolith
 
 ---
 
@@ -175,7 +187,7 @@ This document provides a detailed reference for every major component in the Nov
 | **Downstream** | Subscription Service (post-purchase webhook), ShipBob (fulfilment) |
 
 **Responsibilities**:
-- Hardware product catalogue and storefront
+- NovaDoor product catalogue and storefront
 - Order management and payment processing
 - Fulfilment via ShipBob 3PL
 - Post-purchase trigger: sends webhook to NovaMesh API → Subscription Service to activate subscription trial
@@ -195,90 +207,103 @@ This document provides a detailed reference for every major component in the Nov
 | **Status** | IN-BUILD (~40% complete) |
 | **Language / Runtime** | Python 3.12 / FastAPI |
 | **Database** | Redis (caching, rate limit counters); PostgreSQL (AI request logs) |
-| **SLO** | Target: 99.5% availability; p95 latency < 3s |
-| **Upstream** | OpenAI API, Anthropic API, internal ML model endpoints |
-| **Downstream** | AI Assistant, Support Chatbot, Anomaly Detection, Personalisation Engine |
+| **SLO** | Target: 99.5% availability; p95 latency < 2s |
+| **Upstream** | AWS Rekognition API, OpenAI embeddings API, internal ML model endpoints |
+| **Downstream** | Facial Recognition Engine, Visitor Intelligence Engine, Access Rules Engine, Support Chatbot |
 
 **Responsibilities**:
 - Single internal API surface for all AI capabilities
-- Routing requests to appropriate models (OpenAI, Anthropic, internal)
+- Routing face recognition requests between cloud (AWS Rekognition), internal model, and edge (based on tier and availability)
 - Rate limiting and cost tracking across AI vendor APIs
 - Fallback logic between AI providers
-- Response caching for common requests
+- Response caching for face recognition results (within a recognition session)
 
 **Known gaps**:
 - Currently a thin routing layer; fallback logic and caching are not yet implemented
 - Cost tracking is not yet connected to subscription entitlement checks
-- No circuit breaker on external AI API calls
+- No circuit breaker on external AI API calls (AWS Rekognition)
+- No abstraction layer: if AWS Rekognition API changes, every downstream service must update
 
 ---
 
-## C9 — Anomaly Detection Engine
+## C9 — Facial Recognition Engine
 
 | Field | Value |
 |---|---|
 | **Owner** | AI/ML Team |
-| **Status** | IN-BUILD (beta, ~2,000 opted-in devices) |
+| **Status** | IN-BUILD (beta, ~8,000 opted-in devices) |
 | **Language / Runtime** | Python 3.12 |
-| **Model** | Isolation Forest + LSTM ensemble |
-| **Upstream** | Kafka (device telemetry stream), Data Lake (training data) |
-| **Downstream** | Notification Service (alert dispatch), AI Orchestration Service |
+| **Model** | MobileFaceNet embedding model + cosine similarity matching |
+| **Upstream** | Kafka (visitor event stream with video frames), `novamesh-faces-db` (enrolled embeddings), AWS Rekognition (cloud fallback) |
+| **Downstream** | Notification Service (recognition result for alert), Access Rules Engine (recognition result for rule evaluation), AI Orchestration Service, Data Platform |
 
 **Responsibilities**:
-- Real-time detection of anomalous network behaviour (intrusion, device compromise, unusual traffic)
-- Hardware anomaly detection (thermal, power, connectivity patterns)
-- Alert generation with severity scoring
-- Model retraining pipeline (weekly)
+- Receive visitor face frame events from NovaDoor devices (via Kafka)
+- Extract face embedding from frame and compare against enrolled household embeddings
+- Return recognition result: matched identity (name, confidence), unknown visitor, or no-face-detected
+- Manage enrolled face embeddings: create, update, delete (for face enrollment flow)
+- Biometric data audit logging (all recognition events logged for compliance)
+- Model retraining pipeline (improves with opted-in feedback)
 
 **Known gaps**:
-- Beta rollout only; most customers do not yet receive anomaly alerts
+- Beta rollout only; most customers are using AWS Rekognition as cloud fallback, not the internal model
+- False accept rate ~2% (target: < 0.1%); false reject rate ~6% (target: < 3%)
 - Model retraining pipeline is not automated; manual trigger required
-- False positive rate is ~8% (target: < 2%)
+- No biometric data deletion pipeline — cannot guarantee complete deletion of face embeddings on user request
+- Consent verification before storing face embeddings is not enforced at the API level
 
 ---
 
-## C10 — Predictive Maintenance Engine
+## C10 — Visitor Intelligence Engine
 
 | Field | Value |
 |---|---|
 | **Owner** | AI/ML Team |
 | **Status** | IN-BUILD (proof of concept) |
 | **Language / Runtime** | Python 3.12 |
-| **Model** | Gradient Boosted Trees (XGBoost) |
-| **Upstream** | Data Lake (historical telemetry), Device Management Service |
-| **Downstream** | Notification Service, AI Orchestration Service |
+| **Model** | YOLOv8 (object detection: package, person, vehicle) + pattern analysis |
+| **Upstream** | Data Lake (historical visitor events), Device Management Service, Facial Recognition Engine |
+| **Downstream** | Notification Service, AI Orchestration Service, Access Rules Engine |
 
 **Responsibilities**:
-- Predict hardware failures 7–30 days in advance
-- Trigger proactive replacement or support workflows
-- Feed into customer success workflows for enterprise accounts
+- **Package detection**: identify whether a visitor is carrying a parcel (for delivery notifications)
+- **Visitor pattern analysis**: build expected visitor profiles (time of day, frequency) and alert on anomalies
+- **Familiar visitor suggestions**: prompt users to enroll frequently seen unknown faces
+- Feed visitor intelligence context into Access Rules Engine
 
 **Known gaps**:
-- No production inference yet; only offline batch analysis
-- Insufficient labelled failure data to achieve target accuracy (< 10% false negatives)
+- Package detection is in beta (~2,000 opted-in devices); false positive rate is ~12% (target: < 5%)
+- Visitor pattern analysis is proof of concept only; no production inference yet
+- Insufficient labelled training data for vehicle detection and courier classification
 
 ---
 
-## C11 — AI Assistant
+## C11 — Access Rules Engine
 
 | Field | Value |
 |---|---|
-| **Owner** | AI/ML Team + Mobile/Frontend |
+| **Owner** | AI/ML Team + Platform Engineering |
 | **Status** | IN-BUILD |
-| **Language / Runtime** | Python 3.12 (backend); React Native (frontend widget) |
-| **Upstream** | OpenAI GPT-4o API (primary), Anthropic Claude API (fallback), Device Management Service, Subscription Service |
-| **Downstream** | Device Management Service (command execution), Notification Service |
+| **Language / Runtime** | Python 3.12 (backend); React (rule configuration UI) |
+| **Upstream** | Facial Recognition Engine (recognition results), Visitor Intelligence Engine (context), Device Management Service (lock commands), Subscription Service (entitlement checks) |
+| **Downstream** | Device Management Service (lock/unlock commands), Notification Service (rule-triggered alerts) |
 
 **Responsibilities**:
-- Natural language home control ("Turn off lights at bedtime")
-- Subscription and account queries ("What's my current plan?")
-- Contextual home automation recommendations
-- LLM function calling to execute device commands
+- Real-time rule evaluation triggered by face recognition results
+- Rule types:
+  - **Auto-unlock**: unlock door when a specific enrolled face is detected
+  - **Auto-alert**: send alert with video clip when an unknown visitor arrives
+  - **Time-based rules**: different actions depending on time of day (e.g., auto-unlock only during working hours)
+  - **Block list**: deny access and alert when a specific face is detected
+  - **Package delivery rules**: trigger notification when package detected, even without face recognition
+- Rule configuration stored per-household / per-door in PostgreSQL
+- Enterprise rules: access schedules, visitor clearance levels, emergency lockdown
 
 **Known gaps**:
-- Direct dependency on OpenAI API; no abstraction layer in place
-- Function call safety controls (preventing destructive commands) are not fully tested
-- No rate limiting per user on AI assistant calls (cost risk)
+- Basic auto-unlock rules are in production (beta); complex conditional rules (time-based, context-aware) are in development
+- No safety override: a misconfigured rule could unlock the door unexpectedly or lock residents out
+- Rule execution has no idempotency; a repeated face recognition event could trigger duplicate unlock commands
+- Function safety controls (preventing rules from being configured in dangerous ways) are not fully tested
 
 ---
 
@@ -294,7 +319,7 @@ This document provides a detailed reference for every major component in the Nov
 
 **Responsibilities**:
 - First-line customer support via chat
-- RAG over NovaMesh knowledge base
+- RAG over NovaMesh knowledge base (installation guides, face enrollment troubleshooting, access rules configuration)
 - Escalation to human agent via Zendesk ticket creation
 - User account and subscription query resolution
 
@@ -311,43 +336,49 @@ This document provides a detailed reference for every major component in the Nov
 |---|---|
 | **Owner** | Platform Engineering (with AI/ML Team) |
 | **Status** | IN-BUILD |
-| **Technology** | S3 (Data Lake), AWS Glue, Athena, Apache Kafka (MSK), Snowflake, Airbyte |
+| **Technology** | S3 (Data Lake + Video Storage), AWS Glue, Athena, Apache Kafka (MSK), Snowflake, Airbyte, PostgreSQL + pgvector (`novamesh-faces-db`) |
 | **SLO** | Kafka: 99.9% availability; Data Lake: best-effort |
 | **Upstream** | All microservices (event producers), Shopify (via Airbyte), HubSpot (via Airbyte), Zendesk (via Airbyte) |
 | **Downstream** | AI/ML models (training data), Snowflake (BI/analytics), Metabase |
 
 **Responsibilities**:
-- Real-time event streaming (device telemetry, user events, business events)
-- Data lake storage and cataloguing
+- Real-time event streaming (visitor events, door state changes, face recognition results, user events, business events)
+- **Video storage**: encrypted S3 buckets per household with tier-appropriate retention policies (7 / 30 / 90 / 365 days)
+- **Face embedding store** (`novamesh-faces-db`): enrolled face embeddings per household, with strict access controls; subject to biometric data regulations
+- **Recognition audit log**: immutable log of all face recognition events (who was recognised, when, at which door, confidence score)
+- Data lake storage and cataloguing for AI model training
 - ETL/ELT from SaaS platforms
 - Data warehouse for analytics and reporting
 
 **Known gaps**:
 - Snowflake not yet fully operational
-- Data governance (classification, lineage, access control) not implemented
-- GDPR/CCPA deletion workflows are manual and ad hoc
+- **No biometric data governance**: face embeddings lack classification, lineage, or automated deletion; GDPR/BIPA deletion workflows are manual and ad hoc
+- Video deletion on subscription downgrade is not automated
+- No data residency controls (relevant for EU customers subject to GDPR)
 
 ---
 
-## C14 — Edge AI Runtime (Hub Firmware)
+## C14 — Edge AI Runtime (NovaDoor Firmware)
 
 | Field | Value |
 |---|---|
 | **Owner** | Firmware Team + AI/ML Team |
 | **Status** | LIVE (partial — limited model set) |
-| **Technology** | TensorFlow Lite, custom Linux OS |
+| **Technology** | TensorFlow Lite, MobileFaceNet (quantised), custom Linux OS |
 | **Upstream** | OTA update mechanism (bundled with firmware) |
-| **Downstream** | Device Management Service (telemetry), AI Platform (aggregated signals) |
+| **Downstream** | Device Management Service (visitor event telemetry), AI Platform (recognition results when edge mode active) |
 
 **Responsibilities**:
-- Local inference for privacy-preserving AI processing
-- Current models: anomaly detection (lightweight), voice wake-word detection
-- Runs entirely on-device; no cloud round-trip required for supported features
+- **Person detection** (all tiers): distinguishes people from background motion; triggers camera capture and cloud notification
+- **On-device face recognition** (Insights / Premium tier, privacy mode): runs MobileFaceNet locally; no face data sent to cloud
+- Local door lock/unlock decision when cloud command is unavailable (configurable fail-secure / fail-safe mode)
+- Runs entirely on-device; no cloud round-trip required for supported features in privacy mode
 
 **Known gaps**:
-- ML models can only be updated via a full firmware OTA
+- ML models can only be updated via a full firmware OTA — critical gap for biometric security patches (e.g., model poisoning vulnerability)
 - No A/B testing capability for edge models
-- Limited compute; larger models cannot run locally
+- On-device face recognition accuracy is ~4% lower than cloud model (hardware compute constraints)
+- Fail-secure vs. fail-safe door lock behaviour during cloud outage is not yet configurable by end users
 
 ---
 
@@ -363,14 +394,14 @@ This document provides a detailed reference for every major component in the Nov
 
 **Responsibilities**:
 - Customer and lead database
-- Lifecycle email automation (onboarding, upsell, win-back, renewal)
+- Lifecycle email automation (onboarding, face enrollment prompts, upsell to Insights, win-back, renewal)
 - Sales pipeline management
 - Marketing campaign execution
 
 **Known gaps**:
 - AI personalisation layer not yet connected
-- Customer event data from NovaMesh products is incomplete (many events not tracked)
-- GDPR consent state is not reliably propagated from NovaMesh systems to HubSpot/Customer.io
+- Customer event data from NovaDoor (visitor events, feature usage) is incomplete
+- GDPR/BIPA consent state is not reliably propagated from NovaMesh systems to HubSpot/Customer.io
 
 ---
 
@@ -388,3 +419,4 @@ This document provides a detailed reference for every major component in the Nov
 - Legacy monolith has minimal distributed tracing
 - SLOs are only formally defined for C1, C3, C4
 - On-call ownership is undefined for C6, C8, C9, C10, C11, C12
+- No alerting on biometric data access anomalies (e.g., bulk face embedding queries)

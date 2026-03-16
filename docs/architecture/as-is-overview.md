@@ -28,7 +28,7 @@ How users and devices interact with NovaMesh systems.
 The domain services that implement business logic.
 
 ### Zone 3: AI & Intelligence Layer
-The components responsible for machine learning, inference, and AI-driven features.
+The components responsible for machine learning, inference, and AI-driven features — primarily facial recognition, visitor intelligence, and access rule execution.
 
 ### Zone 4: Foundation
 Shared infrastructure: data stores, messaging, observability, and third-party integrations.
@@ -41,26 +41,30 @@ Shared infrastructure: data stores, messaging, observability, and third-party in
 - React SPA served via CDN (Cloudflare)
 - Connects to the API Gateway
 - Handles consumer and enterprise dashboards
+- Features: face enrollment wizard, visitor history, live camera view, access rule configuration, video clip playback, enterprise multi-door management
 - **Known issue**: Several pages still call the legacy Django monolith API directly, bypassing the API Gateway
 
 ### Mobile Apps — iOS & Android `[LIVE]`
 - React Native codebase (shared ~70% of logic)
-- Push notifications via Firebase Cloud Messaging
-- Device provisioning flow (Wi-Fi onboarding) uses a local Bluetooth handshake with the Hub
+- Push notifications via Firebase Cloud Messaging (real-time "someone at your door" alerts with face label)
+- NovaDoor provisioning flow uses a local Bluetooth handshake for initial Wi-Fi setup
+- Live camera view with two-way audio
+- Remote door unlock/lock controls
 - **Known issue**: Android deep-link handling has a race condition with the auth flow during cold-start
 
-### NovaMesh Hub Firmware `[LIVE]`
-- Custom Linux-based OS on the Hub hardware
+### NovaDoor Firmware `[LIVE]`
+- Custom Linux-based OS on the NovaDoor hardware
 - Communicates with the cloud via MQTT over TLS
-- Runs local inference models (TensorFlow Lite)
+- Runs local inference models (TensorFlow Lite): person detection, on-device face recognition (Protect tier and above)
+- Electronic lock control: receive lock/unlock commands from cloud or local edge decision
 - OTA updates via the Device Management Service
-- **Known issue**: OTA update failures affect ~3–5% of attempts; rollback is manual
+- **Known issue**: OTA update failures affect ~3–5% of attempts; rollback is manual — with safety implications for door lock state
 
 ### Third-Party Integrations — Consumer `[LIVE]`
-- Amazon Alexa skill
+- Amazon Alexa skill ("Alexa, who's at the door?")
 - Google Home integration
-- Apple HomeKit (via HomeKit Accessory Protocol bridge on Hub)
-- IFTTT webhook endpoint
+- Apple HomeKit (via HomeKit Accessory Protocol bridge on NovaDoor)
+- IFTTT webhook endpoint (trigger automations based on visitor events)
 
 ---
 
@@ -70,9 +74,9 @@ Shared infrastructure: data stores, messaging, observability, and third-party in
 The original application. Still runs in production handling:
 - Portions of user authentication (being migrated to Identity Service)
 - Legacy subscription logic (being migrated to Subscription Service)
-- Consumer device dashboard data (some endpoints still active)
+- Consumer door dashboard data (some endpoints still active)
 - Admin tooling for customer support
-- B2B (Enterprise) account management (not yet migrated)
+- B2B (Enterprise) account and site management (not yet migrated)
 
 The monolith runs on AWS ECS (single container), backed by a PostgreSQL RDS instance (`novamesh-monolith-db`). It has no horizontal scaling; vertical scaling has been the workaround.
 
@@ -82,7 +86,8 @@ The monolith runs on AWS ECS (single container), backed by a PostgreSQL RDS inst
 - Newly extracted microservice (Go)
 - Auth0 as the identity provider (external); this service wraps it with NovaMesh business logic
 - Handles: registration, login, MFA, session tokens, user profiles, RBAC roles
-- Owns the `users` domain
+- Manages household member profiles and face enrollment metadata (which faces belong to which household/organisation)
+- Owns the `users` and `households` domain
 - Postgres database: `novamesh-users-db`
 - **Gap**: Enterprise multi-tenancy in RBAC is partially implemented; tenant isolation relies on application-level filtering rather than database-level separation
 
@@ -90,14 +95,16 @@ The monolith runs on AWS ECS (single container), backed by a PostgreSQL RDS inst
 - Partially extracted from the monolith (Node.js / Express)
 - Stripe as the payment processor (external)
 - Handles: subscription creation, plan changes, renewals, invoicing, refunds
+- Subscription tier determines which AI features are available (number of enrolled faces, history length, privacy mode, etc.)
 - Currently has **dual-write** to both its own PostgreSQL DB and the monolith DB during migration
-- **Known issue**: Dual-write occasionally produces inconsistent subscription states
+- **Known issue**: Dual-write occasionally produces inconsistent subscription states, causing users to be granted or denied features incorrectly
 
 ### Device Management Service `[LIVE]`
 - Go microservice
-- Manages Hub device registry, firmware versions, OTA update scheduling
+- Manages NovaDoor device registry, firmware versions, OTA update scheduling
+- Handles door lock/unlock command dispatch to devices via AWS IoT Core
 - MQTT broker: AWS IoT Core
-- Device shadow / state sync: AWS IoT Device Shadow
+- Device shadow / state sync: AWS IoT Device Shadow (tracks: online/offline, lock state, firmware version, camera status)
 - Stores device metadata in DynamoDB
 - **Scaling issue**: At 115K+ devices, DynamoDB hot-partition issues appear during mass OTA rollouts
 
@@ -112,6 +119,7 @@ The monolith runs on AWS ECS (single container), backed by a PostgreSQL RDS inst
 - Node.js microservice
 - Channels: push (Firebase FCM), email (SendGrid), SMS (Twilio)
 - Event-driven: subscribes to SNS topics from other services
+- Core use case: real-time "visitor at door" alerts with face recognition result (name or "Unknown visitor"), video thumbnail, and one-tap remote unlock
 - Preference management is stored in the monolith DB (not yet migrated)
 - **Known issue**: Notification preference data is inconsistently read from two sources
 
@@ -124,7 +132,7 @@ The monolith runs on AWS ECS (single container), backed by a PostgreSQL RDS inst
 ### Marketing & CRM `[LIVE — EXTERNAL]`
 - HubSpot CRM for all customer and lead data
 - Customer.io for lifecycle email automation
-- NovaMesh AI personalisation layer (PLANNED) will feed signals into Customer.io
+- NovaMesh AI personalisation layer (PLANNED) will feed visitor engagement signals into Customer.io
 
 ### API Gateway `[LIVE]`
 - AWS API Gateway + Lambda authoriser
@@ -141,33 +149,29 @@ The core of NovaMesh's product differentiation. Being built as a set of ML servi
 
 Sub-components:
 
-**Anomaly Detection Engine** `[IN-BUILD]`
-- Detects unusual network behaviour (potential intrusions, device malfunctions)
-- Model: ensemble of isolation forest + LSTM
-- Training data: device telemetry from the Data Lake
-- Inference: near-real-time via Kafka stream consumer
-- **Status**: Model in beta with ~2,000 opted-in devices; not yet serving all customers
+**Facial Recognition Engine** `[IN-BUILD]`
+- Identifies visitors by comparing captured face frames against enrolled face embeddings
+- Model: MobileFaceNet-based embedding model + cosine similarity matching
+- Two operating modes:
+  - **Cloud mode** (default): frames sent to cloud for recognition; lower latency than edge-only for complex cases
+  - **Edge mode** (Insights/Premium tier): recognition runs entirely on-device; no face data leaves the device
+- Cloud recognition via AWS Rekognition (external) as temporary measure while internal model matures
+- Internal embedding store: PostgreSQL with `pgvector` extension (`novamesh-faces-db`)
+- **Status**: In beta with ~8,000 opted-in devices; false accept rate ~2%, false reject rate ~6% (targets: FAR < 0.1%, FRR < 3%)
 
-**Predictive Maintenance Engine** `[IN-BUILD]`
-- Predicts hardware failures based on device telemetry patterns
-- Model: gradient boosted trees + feature engineering pipeline
-- **Status**: Proof of concept; no production inference yet
+**Visitor Intelligence Engine** `[IN-BUILD]`
+- Analyses visitor patterns to provide insights: expected delivery windows, frequent visitors, unusual access times
+- Package detection: classifies whether a visitor is carrying a parcel
+- Model: YOLOv8-based object detection (package, person, vehicle)
+- Training data: labelled video frames from opted-in devices
+- **Status**: Package detection in beta (~2,000 opted-in devices); visitor pattern analysis is proof of concept
 
-**Energy Optimisation Engine** `[PLANNED]`
-- Recommends home energy usage patterns
-- Will integrate with smart plug telemetry and energy provider APIs
-- **Status**: Design phase only
-
-**Personalisation & Recommendation Engine** `[PLANNED]`
-- Drives personalised product recommendations and in-app content
-- Planned to use collaborative filtering + LLM-generated explanations
-- **Status**: Not started
-
-**AI Assistant (Natural Language Interface)** `[IN-BUILD]`
-- Conversational interface for home control ("Turn off all lights at 10pm on weekdays")
-- Built on OpenAI GPT-4o API (function calling)
-- Also uses Anthropic Claude API as a fallback
-- **Critical dependency**: No abstraction layer between the AI Assistant and OpenAI API; a breaking API change would require significant rework
+**Access Rules Engine** `[IN-BUILD]`
+- Executes automated actions based on facial recognition results
+- Rules examples: "auto-unlock when it's Alice", "alert + record when an unknown visitor arrives between 10pm–6am", "send welcome message when delivery driver arrives", "deny access to blocked faces and call emergency contact"
+- Rule evaluation: real-time, triggered by face recognition result events
+- Rules stored per-household / per-door in PostgreSQL
+- **Status**: Basic auto-unlock rules in production (beta); complex conditional rules in development
 
 **Support Chatbot** `[IN-BUILD]`
 - LLM-powered customer support assistant
@@ -177,25 +181,27 @@ Sub-components:
 
 **AI Orchestration Service** `[IN-BUILD]`
 - Central service for managing AI feature requests, routing to models, tracking usage
-- Handles rate limiting across AI vendor APIs
+- Handles rate limiting across AI vendor APIs (Rekognition, OpenAI for support chatbot)
 - Provides a single internal API for all AI capabilities
 - **Status**: ~40% complete; currently a thin routing layer only
 
 ### Edge AI Runtime `[LIVE — PARTIAL]`
-- TensorFlow Lite models deployed to Hub devices
-- Current live models: local anomaly detection (lightweight), voice wake word detection
+- TensorFlow Lite models deployed to NovaDoor devices
+- Current live models: person detection (motion classification), on-device face recognition (MobileFaceNet, for Insights/Premium tier privacy mode)
 - Model update mechanism: bundled with firmware OTA (not independently updatable)
-- **Gap**: No ability to update ML models independently of firmware; high friction for model iteration
+- **Gap**: No ability to update ML models independently of firmware; high friction for model iteration, and critical for biometric security patches
 
 ---
 
 ## Zone 4: Foundation
 
 ### Data Platform `[IN-BUILD]`
-- **Data Lake**: S3 + AWS Glue + Athena
-- **Stream Processing**: Apache Kafka (MSK) for real-time telemetry
+- **Data Lake**: S3 + AWS Glue + Athena — stores video clips, visitor event logs, face recognition audit logs
+- **Stream Processing**: Apache Kafka (MSK) for real-time visitor event streams
 - **Data Warehouse**: Snowflake (being set up; not yet fully operational)
 - **ETL**: Airbyte for pulling data from SaaS tools (HubSpot, Zendesk, Shopify) into the warehouse
+- **Face Embedding Store**: PostgreSQL with `pgvector` (`novamesh-faces-db`) — stores enrolled face embeddings per household; biometric data subject to strict access controls
+- **Video Storage**: S3 with per-household prefix and encryption at rest; lifecycle policies for tier-appropriate retention (7 days / 30 days / 90 days / 1 year)
 - **Status**: Data lake is live; Snowflake is partially operational; analytics tooling is still Metabase on top of the monolith DB
 
 ### Observability Stack `[LIVE]`
@@ -226,12 +232,12 @@ Sub-components:
 | Risk | Severity | Affected Zone |
 |---|---|---|
 | Monolith is a single point of failure | Critical | Zone 2 |
-| AI Platform vendor lock-in (OpenAI/Anthropic) | High | Zone 3 |
-| Dual-write inconsistency in Subscription Service | High | Zone 2 |
-| No independent ML model update path (edge) | High | Zone 3 |
+| Biometric data (face embeddings) lacks unified governance and deletion pipeline | Critical | Zone 3, Zone 4 |
+| OTA failure on door locks has physical safety implications | High | Zone 1 |
+| No independent ML model update path (edge) — critical for biometric security patches | High | Zone 3 |
+| AWS Rekognition dependency — no abstraction layer for face recognition | High | Zone 3 |
+| Dual-write inconsistency in Subscription Service causes incorrect feature gating | High | Zone 2 |
 | Enterprise tenant isolation gap | High | Zone 2 |
-| OTA update failure rate | Medium | Zone 1 |
-| Data governance inconsistency across services | Medium | Zone 4 |
-| Direct service-to-service calls bypassing gateway | Medium | Zone 2 |
-| Missing SLOs / unclear on-call ownership | Medium | Zone 4 |
-| Shopify as uncontrolled e-commerce channel | Medium | Zone 2 |
+| Door lock/unlock command path has no local fallback if cloud unreachable | High | Zone 1, Zone 2 |
+| Data governance inconsistency for biometric data across services | High | Zone 4 |
+| Missing SLOs / unclear on-call ownership for AI components | Medium | Zone 3, Zone 4 |

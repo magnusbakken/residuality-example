@@ -8,7 +8,7 @@ A reference catalogue of all technologies used across the NovaMesh platform.
 
 | Technology | Purpose | Notes |
 |---|---|---|
-| AWS (primary) | Cloud infrastructure | EKS, ECS, RDS, DynamoDB, S3, MSK, IoT Core, API Gateway, Lambda, Secrets Manager, SQS, SNS |
+| AWS (primary) | Cloud infrastructure | EKS, ECS, RDS, DynamoDB, S3, MSK, IoT Core, API Gateway, Lambda, Secrets Manager, SQS, SNS, Rekognition, Kinesis Video Streams |
 | GCP (secondary) | ML workloads (Vertex AI, BigQuery experiments) | Limited use; being evaluated |
 | Cloudflare | CDN, DDoS protection, DNS | Web app and API edge caching |
 | Terraform | Infrastructure as Code | All AWS resources defined in Terraform |
@@ -24,12 +24,12 @@ A reference catalogue of all technologies used across the NovaMesh platform.
 | Language | Used For |
 |---|---|
 | Go 1.22 | Identity Service, Device Management Service |
-| Python 3.12 | AI/ML services, Data Platform, Support Chatbot |
+| Python 3.12 | AI/ML services (Facial Recognition, Visitor Intelligence, Access Rules), Data Platform, Support Chatbot |
 | Python 3.11 / Django 4.2 | Legacy Monolith |
 | Node.js 20 | Subscription Service, Notification Service |
-| TypeScript / React | Web Application |
+| TypeScript / React | Web Application (including access rules configuration UI) |
 | React Native | iOS and Android mobile apps |
-| C / Embedded Linux | Hub firmware |
+| C / Embedded Linux | NovaDoor firmware |
 
 ---
 
@@ -38,9 +38,10 @@ A reference catalogue of all technologies used across the NovaMesh platform.
 | Technology | Used By | Notes |
 |---|---|---|
 | PostgreSQL 15 | Identity Service, Subscription Service, Monolith, AI Orchestration | RDS managed instances |
+| PostgreSQL 15 + pgvector | Facial Recognition Engine (`novamesh-faces-db`) | Stores enrolled face embeddings; biometric data — strict access controls required |
 | DynamoDB | Device Management Service | NoSQL; hot-partition risk during mass OTA |
 | Redis | Notification Service (queue), API Gateway (rate limiting), AI Orchestration (cache) | ElastiCache |
-| S3 | Data Lake, firmware artefacts, ML model artefacts | |
+| S3 | Data Lake, firmware artefacts, ML model artefacts, **video clip storage** (per-household, encrypted, tiered retention) | |
 | Pinecone | Support Chatbot | Vector database for RAG |
 | Snowflake | Data Warehouse | Being set up |
 
@@ -50,11 +51,12 @@ A reference catalogue of all technologies used across the NovaMesh platform.
 
 | Technology | Used For | Notes |
 |---|---|---|
-| Apache Kafka (AWS MSK) | Device telemetry, business event bus | Core of real-time data platform |
+| Apache Kafka (AWS MSK) | Visitor event stream (face frames, door events), business event bus | Core of real-time data platform; visitor events are the primary product data stream |
 | AWS SNS | Notification triggers between services | Fan-out from service events |
 | AWS SQS | Async job queues | Used by several services for background work |
-| AWS IoT Core | MQTT broker for Hub device communication | Device → Cloud messaging |
-| AWS IoT Device Shadow | Device state synchronisation | Persistent device state store |
+| AWS IoT Core | MQTT broker for NovaDoor device communication | Device → Cloud messaging; also Cloud → Device for lock commands |
+| AWS IoT Device Shadow | Device state synchronisation | Persistent device state: lock state, camera status, firmware version, online/offline |
+| AWS Kinesis Video Streams | Real-time video streaming from NovaDoor to cloud | Used for live view feature; video is also written to S3 for clip storage |
 
 ---
 
@@ -62,14 +64,14 @@ A reference catalogue of all technologies used across the NovaMesh platform.
 
 | Technology | Used For | Notes |
 |---|---|---|
-| OpenAI GPT-4o API | AI Assistant (primary LLM), Support Chatbot | Critical external dependency; no abstraction layer |
-| Anthropic Claude API | AI Assistant (fallback) | Partial fallback; not fully implemented |
+| AWS Rekognition | Facial recognition (cloud mode, current default) | External dependency; no internal abstraction layer — critical risk |
+| MobileFaceNet (TFLite) | On-device face recognition (privacy mode, Insights/Premium tier) | Quantised model; runs on NovaDoor embedded NPU |
+| MobileFaceNet (PyTorch) | Cloud facial recognition (internal model, in development) | Internal model being developed to replace AWS Rekognition dependency |
+| YOLOv8 | Visitor Intelligence Engine — package detection, person classification | Object detection on visitor frames |
+| TensorFlow Lite | Edge AI runtime on NovaDoor firmware | Person detection, on-device face recognition |
+| PyTorch | Internal ML model training (face recognition, visitor intelligence) | Training infrastructure on EKS + GCP Vertex AI |
 | OpenAI Embeddings API | Support Chatbot (RAG embeddings) | `text-embedding-3-large` |
-| TensorFlow Lite | Edge AI on Hub firmware | Anomaly detection, wake-word models |
-| XGBoost | Predictive Maintenance Engine | Gradient boosted trees |
-| Scikit-learn | Anomaly Detection Engine (Isolation Forest) | Ensemble with LSTM |
-| PyTorch | LSTM component of Anomaly Detection | |
-| Pinecone | Vector store for RAG | |
+| Pinecone | Vector store for Support Chatbot RAG | |
 | AWS Glue / Athena | Data cataloguing and query | Over S3 Data Lake |
 | Airbyte | ELT from SaaS sources | Shopify, HubSpot, Zendesk → Snowflake |
 
@@ -81,9 +83,10 @@ A reference catalogue of all technologies used across the NovaMesh platform.
 |---|---|---|
 | Auth0 | Identity Provider (OAuth2/OIDC) | High — core auth dependency |
 | Stripe | Payment processing | High — revenue-critical |
+| AWS Rekognition | Facial recognition (cloud mode) | **Very High** — core product feature dependency; biometric data processing; no abstraction layer |
 | Shopify Plus | Hardware e-commerce storefront | Medium — not owned by NovaMesh |
 | ShipBob | 3PL fulfilment | Medium — physical supply chain |
-| Firebase FCM | Push notifications (mobile) | Medium |
+| Firebase FCM | Push notifications (mobile) — visitor alerts | Medium |
 | SendGrid | Transactional email | Low |
 | Twilio | SMS notifications | Low |
 | HubSpot | CRM | Medium — customer data |
@@ -113,7 +116,7 @@ A reference catalogue of all technologies used across the NovaMesh platform.
 | Technology | Purpose |
 |---|---|
 | AWS Secrets Manager | Secret and credential storage |
-| AWS KMS | Encryption key management |
+| AWS KMS | Encryption key management — also used for face embedding encryption at rest |
 | Auth0 | Authentication, MFA |
 | Cloudflare WAF | Web Application Firewall |
 | Snyk | Dependency vulnerability scanning |
@@ -126,9 +129,12 @@ A reference catalogue of all technologies used across the NovaMesh platform.
 
 | Gap | Risk |
 |---|---|
+| No AI provider abstraction layer for face recognition | AWS Rekognition lock-in; a breaking change or price change could take weeks to fix and affects the core product feature |
+| No biometric data governance tooling | GDPR / BIPA compliance for face embeddings is manual; no automated classification, lineage, or deletion pipeline |
+| No independent ML model update path (edge) | Biometric security patches require a full firmware OTA — weeks of delay for critical model fixes |
 | No service mesh (e.g. Istio/Linkerd) | Internal service calls lack mTLS, circuit breaking, and observability |
-| No AI provider abstraction layer | Vendor lock-in for OpenAI; breaking changes could take weeks to fix |
-| No data classification/lineage tooling | GDPR compliance is manual and error-prone |
-| No feature flag system | Rollouts are all-or-nothing; no progressive delivery |
-| No chaos engineering tooling | Resilience is untested under failure conditions |
+| No data classification/lineage tooling | Biometric and PII data handling is ad hoc and error-prone |
+| No feature flag system | Rollouts are all-or-nothing; no progressive delivery for face recognition models |
+| No chaos engineering tooling | Resilience is untested under failure conditions — especially critical for door lock safety |
 | No SBOM tooling | Software supply chain visibility is limited |
+| No biometric data residency controls | EU customer face data may not be guaranteed to remain within EU |

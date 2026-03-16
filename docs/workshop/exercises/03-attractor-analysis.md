@@ -30,10 +30,10 @@ Read the [Attractors Analysis](../../residuality-theory/attractors-analysis.md) 
 | ID | Name | Short Description |
 |---|---|---|
 | A1 | Monolith Resurrection | Microservices migration stalls; features flow back into the monolith |
-| A2 | AI Vendor Capture | All AI capabilities become structurally dependent on a single external vendor |
-| A3 | Enterprise Monoculture | Enterprise revenue dominates; consumer product stagnates; AI training data degrades |
-| A4 | Fragmented Microservices Swamp | 40+ services with unclear ownership, no governance, cascading complexity |
-| A5 | Privacy Collapse | Regulatory enforcement forces data minimisation; AI capabilities are degraded |
+| A2 | Face Recognition Vendor Capture | All facial recognition becomes structurally dependent on AWS Rekognition; internal model abandoned; biometric data permanently third-party |
+| A3 | Enterprise Monoculture | Enterprise access control revenue dominates; consumer AI recognition stagnates; training data degrades |
+| A4 | Fragmented Microservices Swamp | 40+ services with unclear ownership; recognition pipeline has no end-to-end SLO; door safety guarantees impossible |
+| A5 | Biometric Privacy Collapse | Regulatory enforcement or breach forces data minimisation; recognition accuracy drops; auto-unlock cannot be offered safely |
 
 ---
 
@@ -106,8 +106,9 @@ For each missing attractor you identify:
 - "What would happen to NovaMesh if it grew 10x without changing its architecture?"
 - "What if NovaMesh ran out of money and had to operate with 40% of its current engineering team?"
 - "What if the founders left and the company was acquired by a private equity firm focused on cost extraction?"
-- "What if edge AI hardware improved so dramatically that cloud AI became unnecessary?"
-- "What if a competitor API emerged that made NovaMesh's platform capability unnecessary (e.g., a universal smart home OS)?"
+- "What if edge AI hardware improved so dramatically that cloud-based facial recognition became unnecessary — but NovaMesh's business model still requires cloud subscriptions?"
+- "What if a competitor or platform (e.g., Apple HomeKit) shipped a door lock standard that all hardware must comply with, removing NovaMesh's ability to differentiate on AI?"
+- "What if a series of high-profile false-accept incidents (a stranger auto-unlocked into a home) forced NovaMesh to disable auto-unlock company-wide until accuracy could be guaranteed?"
 
 ---
 
@@ -116,8 +117,8 @@ For each missing attractor you identify:
 Complex systems can move toward multiple attractors simultaneously. Some attractor pairs are reinforcing; others conflict.
 
 Quick discussion:
-- "Which two attractors, if NovaMesh entered both simultaneously, would be most damaging? Why?"
-- "Are there any attractors that, if entered, would prevent the system from entering another? What makes them exclusive?"
+- "Which two attractors, if NovaMesh entered both simultaneously, would be most damaging? (Hint: consider A2 + A5 — what happens to the product if both vendor capture AND biometric privacy collapse occur simultaneously?)"
+- "Are there any attractors that, if entered, would prevent the system from entering another? (Hint: could entering A5 (Biometric Privacy Collapse) actually prevent A2 (Vendor Capture) by forcing edge-only recognition?)"
 
 ---
 

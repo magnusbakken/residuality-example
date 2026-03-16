@@ -1,139 +1,123 @@
-# Domain Map — Bounded Contexts
+# Domain Map — Bounded Context Map
 
-This diagram shows the domain-oriented decomposition of the NovaMesh platform, illustrating how business capabilities map to bounded contexts and the relationships (context mappings) between them.
-
----
-
-## Bounded Context Map
+This diagram shows the NovaMesh bounded contexts (domains) and their relationships, using Domain-Driven Design (DDD) terminology.
 
 ```mermaid
-graph TB
-    subgraph Identity["🔑 Identity & Access Domain"]
-        direction TB
-        IAM_CTX["Identity Context\n─────────────\nUser registration & auth\nSession management\nMFA / OAuth2\nRBAC roles\n\n[C1 — Identity Service]"]
+graph TD
+    subgraph Identity["Identity & Access Domain"]
+        ID_CTX["Identity & Access\n(C1 — Identity Service)\n🟢 LIVE"]
     end
 
-    subgraph Commerce["🛒 Commerce Domain"]
-        direction TB
-        SALES_CTX["Sales Context\n─────────────\nHardware product catalogue\nOrder management\nFulfilment coordination\nPost-purchase activation\n\n[C7 — Shopify EXTERNAL]"]
-        BILLING_CTX["Billing & Subscription Context\n─────────────\nSubscription lifecycle\nPayment processing\nPlan entitlements\nInvoicing & refunds\n\n[C6 — Subscription Service]"]
+    subgraph Commerce["Commerce Domain"]
+        SALES_CTX["Sales\n(C7 — Shopify)"]
+        BILLING_CTX["Billing\n(C6 — Subscription Service)\n🟡 MIGRATING"]
     end
 
-    subgraph Devices["📡 Device Domain"]
-        direction TB
-        FLEET_CTX["Device Fleet Context\n─────────────\nDevice registry & provisioning\nFirmware version management\nOTA update campaigns\nFleet health monitoring\n\n[C3 — Device Management Service]"]
-        EDGE_CTX["Edge Intelligence Context\n─────────────\nOn-device inference\nLocal automation rules\nPrivacy-preserving processing\nWake-word detection\n\n[C14 — Hub Firmware]"]
+    subgraph Devices["Devices Domain"]
+        FLEET_CTX["Device Fleet\n(C3 — Device Management)\n🟢 LIVE"]
+        EDGE_CTX["Edge AI\n(C14 — NovaDoor Firmware)\n🟢 LIVE (partial)"]
     end
 
-    subgraph Intelligence["🤖 AI & Intelligence Domain"]
-        direction TB
-        AI_ORCH_CTX["AI Orchestration Context\n─────────────\nAI provider routing\nRate limiting & cost control\nFallback management\nUsage tracking\n\n[C8 — AI Orchestration Service]"]
-        ANOMALY_CTX["Anomaly Detection Context\n─────────────\nNetwork threat detection\nDevice health anomalies\nAlert generation\nModel retraining\n\n[C9 — Anomaly Engine]"]
-        MAINTENANCE_CTX["Predictive Maintenance Context\n─────────────\nFailure prediction\nProactive replacement triggers\n\n[C10 — Maintenance Engine]"]
-        ASSISTANT_CTX["AI Assistant Context\n─────────────\nNatural language control\nHome automation via NLU\nContextual recommendations\n\n[C11 — AI Assistant]"]
+    subgraph AI["AI & Intelligence Domain"]
+        FACE_CTX["Facial Recognition\n(C9 — Face Recognition Engine)\n🔵 IN-BUILD"]
+        VISITOR_CTX["Visitor Intelligence\n(C10 — Visitor Intelligence)\n🔵 IN-BUILD"]
+        ACCESS_CTX["Access Rules\n(C11 — Access Rules Engine)\n🔵 IN-BUILD"]
+        ORCH_CTX["AI Orchestration\n(C8)\n🔵 IN-BUILD"]
     end
 
-    subgraph CX["💬 Customer Experience Domain"]
-        direction TB
-        SUPPORT_CTX["Support Context\n─────────────\nTicket management\nKnowledge base\nAI-assisted resolution\nEscalation workflows\n\n[C12 — Support Chatbot + Zendesk]"]
-        NOTIFY_CTX["Notification Context\n─────────────\nMulti-channel delivery\nPreference management\nAlert routing\n\n[C5 — Notification Service]"]
+    subgraph Customer["Customer Experience Domain"]
+        SUPPORT_CTX["Support\n(C12 — Support Chatbot + Zendesk)"]
+        NOTIF_CTX["Notifications\n(C5 — Notification Service)\n🟢 LIVE"]
     end
 
-    subgraph Marketing["📣 Marketing & Growth Domain"]
-        direction TB
-        CRM_CTX["CRM & Marketing Context\n─────────────\nLead management\nLifecycle automation\nCampaign execution\nAI personalisation (PLANNED)\n\n[C15 — HubSpot + Customer.io]"]
+    subgraph Marketing["Marketing & Growth Domain"]
+        MKT_CTX["Marketing & CRM\n(C15 — HubSpot + Customer.io)"]
     end
 
-    subgraph Data["📊 Data & Analytics Domain"]
-        direction TB
-        DATA_CTX["Data Platform Context\n─────────────\nReal-time event streaming\nData lake & warehouse\nML training data\nBusiness analytics\n\n[C13 — Data Platform]"]
+    subgraph Data["Data & Analytics Domain"]
+        DATA_CTX["Data Platform\n(C13 — S3 + Kafka + Snowflake + pgvector)\n🔵 IN-BUILD"]
     end
 
-    subgraph Legacy["⚠️ Legacy (Transitional)"]
-        direction TB
-        MONOLITH_CTX["Monolith Context\n─────────────\nEnterprise account mgmt\nAdmin tooling\nLegacy subscription endpoints\nSupport back-office\n\n[C2 — Django Monolith]"]
+    subgraph Legacy["Legacy Domain"]
+        MONO_CTX["Legacy Monolith\n(C2 — Django)\n🟡 MIGRATING\nEnterprise accounts; notification prefs;\nadmin tooling; legacy subscriptions"]
     end
 
-    %% Context relationships
-    IAM_CTX -->|"Shared Kernel\nUser identity"| BILLING_CTX
-    IAM_CTX -->|"Upstream / Downstream\nAuth principal"| FLEET_CTX
-    IAM_CTX -->|"Upstream / Downstream\nAuth principal"| AI_ORCH_CTX
+    ID_CTX -->|"Customer/Supplier\n(Identity owns user + household data;\nother contexts are consumers)"| BILLING_CTX
+    ID_CTX -->|"Customer/Supplier"| FLEET_CTX
+    ID_CTX -->|"Customer/Supplier"| FACE_CTX
+    ID_CTX -->|"Customer/Supplier"| ACCESS_CTX
 
-    SALES_CTX -->|"Published Event\norder.purchased"| BILLING_CTX
-    BILLING_CTX -->|"Conformist\nEntitlement check"| AI_ORCH_CTX
-    BILLING_CTX -->|"Conformist\nEntitlement check"| ANOMALY_CTX
+    SALES_CTX -->|"Published Event\n(order_complete → trial activation)"| BILLING_CTX
+    BILLING_CTX -->|"Published Event\n(subscription_changed → entitlement update)"| FACE_CTX
+    BILLING_CTX -->|"Published Event\n(subscription_changed → entitlement update)"| ACCESS_CTX
+    BILLING_CTX -->|"⚠️ Shared Database\n(dual-write — migration state)"| MONO_CTX
 
-    FLEET_CTX -->|"Published Event\ndevice.telemetry"| DATA_CTX
-    FLEET_CTX -->|"Customer/Supplier\nDevice commands"| EDGE_CTX
-    EDGE_CTX -->|"Published Event\nedge.inference.result"| DATA_CTX
+    FLEET_CTX -->|"Published Event\n(visitor_event → face frames)"| FACE_CTX
+    FLEET_CTX -->|"Published Event\n(visitor_event → object detection)"| VISITOR_CTX
+    FLEET_CTX -->|"Customer/Supplier\n(lock commands → device)"| EDGE_CTX
 
-    DATA_CTX -->|"Training data\nmodel artefacts"| ANOMALY_CTX
-    DATA_CTX -->|"Training data"| MAINTENANCE_CTX
+    FACE_CTX -->|"Published Event\n(recognition_result)"| ACCESS_CTX
+    FACE_CTX -->|"Published Event\n(recognition_result)"| NOTIF_CTX
+    FACE_CTX -->|"Customer/Supplier\n(routes recognition to vendor)"| ORCH_CTX
+    VISITOR_CTX -->|"Context\n(package/visitor context)"| ACCESS_CTX
+    VISITOR_CTX -->|"Published Event\n(package detected)"| NOTIF_CTX
 
-    AI_ORCH_CTX -->|"Anti-Corruption Layer\n(partial, in-build)"| ASSISTANT_CTX
-    AI_ORCH_CTX -->|"Anti-Corruption Layer\n(partial, in-build)"| ANOMALY_CTX
+    ACCESS_CTX -->|"Customer/Supplier\n(issues lock commands)"| FLEET_CTX
+    ACCESS_CTX -->|"Published Event\n(rule triggered)"| NOTIF_CTX
 
-    ANOMALY_CTX -->|"Published Event\nalert.anomaly"| NOTIFY_CTX
-    MAINTENANCE_CTX -->|"Published Event\nalert.maintenance"| NOTIFY_CTX
-    ASSISTANT_CTX -->|"Commands"| FLEET_CTX
+    NOTIF_CTX -->|"⚠️ Conformist\n(reads preferences from monolith DB)"| MONO_CTX
 
-    SUPPORT_CTX -->|"Customer/Supplier\nTickets & KB"| NOTIFY_CTX
-    CRM_CTX -->|"Conformist\nCustomer events"| DATA_CTX
+    FACE_CTX -->|"Anti-Corruption Layer\n(translates to/from Rekognition API)"| ORCH_CTX
+    SUPPORT_CTX -->|"Conformist (external ticketing system)"| MONO_CTX
 
-    MONOLITH_CTX -.->|"Shared Database\n⚠️ tight coupling"| BILLING_CTX
-    MONOLITH_CTX -.->|"Legacy calls\n⚠️ direct HTTP"| IAM_CTX
-    MONOLITH_CTX -.->|"Legacy calls\n⚠️ direct HTTP"| NOTIFY_CTX
+    FLEET_CTX -->|"Published Event\n(telemetry)"| DATA_CTX
+    FACE_CTX -->|"Published Event\n(recognition events + face frames)"| DATA_CTX
+    BILLING_CTX -->|"Published Event\n(billing events)"| DATA_CTX
 
-    %% Styling
-    style Legacy fill:#ffe8cc,stroke:#ff8800
-    style Intelligence fill:#e8f4fd,stroke:#2196F3
-    style Devices fill:#e8fde8,stroke:#4CAF50
-    style Identity fill:#fde8fd,stroke:#9C27B0
-    style Commerce fill:#fdfde8,stroke:#FF9800
+    MKT_CTX -->|"Anti-Corruption Layer\n(customer events via Airbyte)"| DATA_CTX
 ```
-
----
-
-## Context Mapping Legend
-
-| Relationship Type | Description |
-|---|---|
-| **Shared Kernel** | Two contexts share a subset of the domain model; changes must be coordinated |
-| **Customer/Supplier** | Upstream (supplier) context provides a service to downstream (customer) |
-| **Conformist** | Downstream adopts the upstream model with no translation |
-| **Anti-Corruption Layer** | Downstream translates upstream model to protect its own domain model |
-| **Published Event** | Upstream emits events; downstream subscribes with no direct coupling |
-| **Shared Database** (⚠️) | Two contexts read/write the same physical database — high coupling, technical debt |
 
 ---
 
 ## Domain Ownership Matrix
 
-| Domain | Team | Maturity | Migration Priority |
+| Domain | Owning Team | Maturity | Migration Priority |
 |---|---|---|---|
-| Identity & Access | Platform Engineering | High | Complete |
-| Commerce — Sales | Marketing/Ops (Shopify) | External | N/A |
-| Commerce — Billing | Platform Engineering | Medium | High (dual-write risk) |
-| Device Fleet | Platform Engineering | High | Complete |
-| Edge Intelligence | Firmware + AI/ML | Medium | Low (stable) |
-| AI Orchestration | AI/ML Team | Low | Critical (in-build) |
-| Anomaly Detection | AI/ML Team | Low | High |
-| Predictive Maintenance | AI/ML Team | Very Low | Medium |
-| AI Assistant | AI/ML + Frontend | Low | High |
-| Support | AI/ML Team | Low | Medium |
-| Notifications | Platform Engineering | Medium | Low |
-| Marketing & CRM | Marketing | External | N/A |
-| Data Platform | Platform + AI/ML | Medium | High |
-| Legacy Monolith | Platform Engineering | High (debt) | Critical (decompose) |
+| Identity & Access | Platform Engineering | High | Mostly done (~60%) |
+| Commerce — Sales | Marketing/Ops | Medium (external) | Low |
+| Commerce — Billing | Platform Engineering | Medium (migrating) | High |
+| Devices — Fleet | Platform Engineering | High | Mostly done |
+| Devices — Edge AI | Firmware + AI/ML | Medium (partial) | High (model update path) |
+| AI — Facial Recognition | AI/ML Team | Low (beta) | **Critical** |
+| AI — Visitor Intelligence | AI/ML Team | Very Low (PoC) | Medium |
+| AI — Access Rules | AI/ML + Platform | Low (beta) | High |
+| AI — Orchestration | AI/ML Team | Very Low (40%) | High |
+| Customer Experience — Notifications | Platform Engineering | High | Medium (prefs migration) |
+| Customer Experience — Support | AI/ML Team | Low (in-build) | Medium |
+| Marketing & Growth | Marketing | Medium (external) | Low |
+| Data & Analytics | Platform + AI/ML | Low (in-build) | **Critical** (biometric data) |
+| Legacy | Platform Engineering | — (diminishing) | **Eliminate** |
 
 ---
 
-## Enterprise Domain — Gap
+## The Enterprise Domain Gap
 
-The **Enterprise/B2B domain** is currently entirely inside the Legacy Monolith and has no extracted bounded context. This is a significant gap:
+The Enterprise domain — which covers multi-door management, multi-site access control, visitor clearance workflows, and compliance reporting — sits **entirely inside the Legacy Monolith**. There is no extracted bounded context for it. This means:
 
-- Multi-tenancy logic is not isolated
-- Enterprise billing (custom contracts, volume discounts) is not in the Subscription Service
-- Enterprise fleet management capabilities are duplicated between the Monolith and Device Management Service
+1. Enterprise features cannot be independently deployed, scaled, or tested
+2. All enterprise account data is mixed with consumer data in the `novamesh-monolith-db` database (no tenant isolation at the DB level)
+3. Any monolith failure affects enterprise customers disproportionately — their administration capabilities depend entirely on the monolith admin portal
 
-A dedicated **Enterprise Context** is required before NovaMesh can safely scale its B2B business.
+Extracting the Enterprise domain is listed as a migration priority but has not yet started.
+
+---
+
+## The Biometric Data Domain Problem
+
+Unlike standard user PII, biometric data (face embeddings) has cross-cutting ownership:
+- **Identity Service** (C1) owns face profile metadata (which person, which household)
+- **Facial Recognition Engine** (C9) owns the embeddings themselves and the enrollment process
+- **Data Platform** (C13) stores face frames, recognition audit logs, and training data
+- **Access Rules Engine** (C11) uses recognition results to trigger physical door events
+
+There is no single bounded context that owns the full lifecycle of biometric data — from enrollment through consent tracking, use, and deletion. This creates a classic hyperliminal coupling through the **regulatory specification** (GDPR / BIPA): any enforcement action for biometric data touches all four domains simultaneously.

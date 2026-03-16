@@ -42,13 +42,13 @@ A component describes structure. A residue describes **behaviour under stress**.
 
 ### Example from NovaMesh
 
-Consider the **Notification Service** (C5). As a component, it looks fairly independent — it receives SNS events, sends push/email/SMS, has its own Redis queue. As a residue, a different picture emerges:
+Consider the **Notification Service** (C5). As a component, it looks fairly independent — it receives SNS events, sends push alerts with face recognition results, has its own Redis queue. As a residue, a different picture emerges:
 
-- **Stressor: Monolith database unavailable** — The Notification Service cannot read user notification preferences (still stored in the monolith DB). It either sends notifications to all users regardless of opt-out (privacy/compliance risk) or silently fails to send (service degradation).
-- **Stressor: Firebase FCM API rate limit exceeded** — Push notifications are dropped with no retry or dead-letter queue.
-- **Stressor: SendGrid deliverability issue** — Email delivery silently fails; no fallback channel.
+- **Stressor: Monolith database unavailable** — The Notification Service cannot read user notification preferences (still stored in the monolith DB). It either sends visitor alerts to all users regardless of opt-out (privacy/compliance risk) or silently fails to send alerts (residents don't know someone is at their door).
+- **Stressor: AWS Rekognition outage** — The face recognition result that the notification is supposed to include ("Alice is at your door") is unavailable. The Notification Service either sends a generic "motion detected" alert (degraded experience) or waits for recognition that never arrives (delayed alert).
+- **Stressor: Firebase FCM rate limit exceeded** — Visitor push alerts are dropped with no retry or dead-letter queue. During high-traffic periods (e.g., a neighbourhood event where many people approach many doors), the most critical notifications may not be delivered.
 
-The component appears self-contained. The residue analysis reveals **three hidden failure modes** that were invisible from the component perspective alone.
+The component appears self-contained. The residue analysis reveals **three hidden failure modes** that were invisible from the component perspective alone — and in the NovaMesh context, these failures have physical-world consequences (someone at the door who the resident doesn't know about).
 
 ---
 
@@ -56,7 +56,15 @@ The component appears self-contained. The residue analysis reveals **three hidde
 
 Complex systems don't explore all possible states — they gravitate toward attractors. For software architecture, attractors are the stable configurations that the system naturally settles into when left to evolve under various pressures.
 
-The Residuality Theory workshop will explore **five attractors** for the NovaMesh architecture. Understanding these attractors helps explain *why* the system behaves the way it does under stress, and helps architects design residues that remain viable across multiple attractors.
+The Residuality Theory workshop will explore **five attractors** for the NovaMesh architecture:
+
+- **A1 — Monolith Resurrection**: The microservices migration stalls; enterprise and AI features grow back into the monolith
+- **A2 — Face Recognition Vendor Capture**: Structural lock-in to AWS Rekognition; internal model development abandoned; biometric data permanently third-party
+- **A3 — Enterprise Monoculture**: Enterprise access control revenue dominates; consumer AI recognition stagnates
+- **A4 — Fragmented Microservices Swamp**: 40+ services with no governance; recognition pipeline has no end-to-end SLO; door safety guarantees impossible to make
+- **A5 — Biometric Privacy Collapse**: Regulatory enforcement or breach forces data minimisation; recognition accuracy drops; auto-unlock feature cannot be offered safely
+
+Understanding these attractors helps explain *why* the system behaves the way it does under stress, and helps architects design residues that remain viable across multiple attractors.
 
 See the [Attractors Analysis](./attractors-analysis.md) document for the full analysis.
 
@@ -109,14 +117,14 @@ Apply the new stressors to the updated architecture. Ask: is it now difficult to
 
 NovaMesh presents a rich set of conditions that make Residuality Theory analysis particularly valuable:
 
-1. **Multi-domain complexity**: Hardware + SaaS + AI creates unusual cross-domain stressor patterns (e.g., a supply chain disruption affects not only physical sales but also the AI training data pipeline and device telemetry coverage)
+1. **Physical safety dimension**: Unlike a typical SaaS platform, NovaMesh controls door locks. A failed auto-unlock rule, a false accept, or a firmware bug has physical-world consequences — locking residents out or letting strangers in. This makes the question of residue design directly tied to safety, not just reliability.
 
-2. **Mid-migration state**: The architecture is in flux — some components are mature, others are being built, others are planned. This is the most dangerous state for an architecture, because assumptions from the stable components may not hold for the in-flight ones
+2. **Biometric data as a cross-cutting stressor attractor**: Facial recognition data (face embeddings) is subject to regulations that are newer, stricter, and more rapidly evolving than standard PII. GDPR's biometric provisions, Illinois BIPA, and city-level facial recognition bans create a regulatory stressor landscape that crosses every domain simultaneously.
 
-3. **AI vendor concentration**: The dependency on OpenAI/Anthropic without an abstraction layer is an unusually high-risk coupling that will surface repeatedly in stressor analysis
+3. **Multi-domain complexity**: Hardware + SaaS + AI + physical security creates unusual cross-domain stressor patterns (e.g., a supply chain disruption affects not only physical sales but also recognition training data coverage, edge model deployment, and subscription activation)
 
-4. **Regulatory exposure**: GDPR/CCPA in combination with AI-driven personalisation and an IoT data platform creates regulatory stressor vectors that span nearly every domain
+4. **Mid-migration state**: The architecture is in flux — some components are mature, others are being built, others are planned. This is the most dangerous state for an architecture, because assumptions from the stable components may not hold for the in-flight ones
 
-5. **Growth-driven pressure**: At 175% YoY growth, the stressors of rapid scale will arrive before the architecture is ready — making the analysis forward-looking as well as current-state
+5. **AI vendor concentration**: The dependency on AWS Rekognition without an abstraction layer is an unusually high-risk coupling — particularly because biometric data crosses the boundary to a third party with every recognition request
 
-6. **Hidden hyperliminal coupling**: The Notification Service → Monolith DB dependency is a perfect example of the kind of coupling that Residuality Theory is uniquely positioned to surface
+6. **Hidden hyperliminal coupling**: The Notification Service → Monolith DB dependency is a perfect example of the kind of coupling that Residuality Theory is uniquely positioned to surface. The recognition pipeline coupling (C9 → C11 → C3) is an even richer example because failure anywhere in the chain prevents auto-unlock — but each component has different owners and different stressor profiles.

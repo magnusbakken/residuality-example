@@ -1,10 +1,14 @@
 # NovaMesh — Residuality Theory Architecture Demo
 
-This repository contains the architecture documentation and workshop materials for **NovaMesh**, a fictional smart home technology company used as a case study for exploring [Barry O'Reilly's Residuality Theory](https://leanpub.com/residuality).
+This repository contains the architecture documentation and workshop materials for **NovaMesh**, a fictional smart door technology company used as a case study for exploring [Barry O'Reilly's Residuality Theory](https://leanpub.com/residuality).
+
+NovaMesh makes the **NovaDoor** — a smart door device with a built-in 4K camera, electronic lock, and AI-powered facial recognition. The device identifies visitors (enrolled household members, known guests, unknown strangers), automatically unlocks for recognised faces, and sends real-time alerts to the homeowner's mobile app. Optional enterprise features support multi-door building access control, visitor management, and compliance reporting.
 
 ## Purpose
 
 This demo is designed for architects, developers, and stakeholders who want to apply Residuality Theory techniques — specifically **stressor analysis**, **attractor mapping**, and **incidence matrices** — to a realistic, multi-domain software system. The NovaMesh architecture intentionally represents a company mid-transition: with legacy components, ongoing migrations, newly built microservices, and ambitious AI capabilities either in-flight or planned.
+
+NovaMesh is a particularly rich subject because it sits at the intersection of **physical hardware** (door locks), **biometric AI** (facial recognition), **real-time cloud infrastructure**, and **sensitive data regulation** (GDPR, BIPA) — creating unusual and non-obvious cross-domain stressor patterns.
 
 ## What is Residuality Theory?
 

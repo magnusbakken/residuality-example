@@ -86,14 +86,14 @@ From the outputs of Exercises 2 and 3, identify the 3 highest-priority residue t
 
 The pre-built [Incidence Matrix Analysis](../../residuality-theory/incidence-matrix.md#residue-design-priorities-derived-from-matrix) suggests the following prioritised residues (your team may have a different prioritisation based on your stressor selection):
 
-1. Multi-region / infrastructure resilience capability
-2. Monolith decomposition completion (enterprise context)
-3. Unified data governance and deletion pipeline
-4. AI provider abstraction layer
-5. Notification Service preference migration (end the monolith dependency)
-6. AI explainability / audit capability
-7. Automated OTA rollback mechanism
-8. Knowledge management / documentation for AI systems
+1. Multi-region / infrastructure resilience capability (with door lock failover behaviour)
+2. Biometric data governance pipeline (consent, deletion, residency)
+3. AI provider abstraction layer for facial recognition (escape Rekognition lock-in)
+4. Edge-first recognition mode (auto-unlock without cloud dependency)
+5. Independent ML model update path (decouple face recognition model from firmware OTA)
+6. Monolith decomposition completion (notification preferences + enterprise accounts)
+7. Recognition pipeline end-to-end SLO (C9 → C11 → C3 chain with safety guarantees)
+8. Biometric consent and geo-fencing capability (respond to regulatory prohibition)
 
 **Your team's top 3 may differ** — use your own incidence matrix and attractor analysis outputs.
 
@@ -126,7 +126,7 @@ This is the core Residuality Theory test. Complete the sentence:
 > *"If [stressor] arrives, the system [verb: continues / degrades to / recovers by / adapts to] [describe observable behaviour]. The residue survives as [describe what persists through the stress]."*
 
 Example:
-> *"If OpenAI experiences an extended outage (S-TECH-02), the system continues serving AI-assisted home control requests via the Anthropic fallback, with response times increasing by < 500ms. The AI provider abstraction layer residue survives as the interface specification and routing logic — which remains unchanged regardless of which underlying provider is active."*
+> *"If AWS Rekognition experiences an outage (S-TECH-02), all Insights/Premium tier customers continue receiving accurate visitor identification via on-device face recognition. Free/Protect tier customers receive 'Unknown visitor' alerts until cloud recognition is restored. The edge recognition residue survives as the on-device model, inference pipeline, and local auto-unlock rule execution — which remain functional independent of cloud availability."*
 
 #### During "Trade-offs"
 
@@ -143,10 +143,10 @@ If a team can't identify trade-offs, they haven't thought about the residue crit
 The facilitator provides 2 new stressors not in the team's working set. Ask: does this residue already handle them?
 
 Suggested new stressors for the criticality test:
-- "What if a critical dependency on a specific database engine (PostgreSQL) became untenable due to licensing changes?"
-- "What if a major mobile OS update broke the React Native app's push notification handling permanently?"
-- "What if customer behaviour changed so that 90% of interactions moved to voice interfaces exclusively?"
-- "What if a new AI architecture paradigm emerged that made all current ML models obsolete within 12 months?"
+- "What if a court ruling required all enrolled face embeddings to be stored only on the device itself, with no cloud copy?"
+- "What if a major mobile OS update broke the React Native app's push notification handling — meaning visitor alerts stop reaching homeowners?"
+- "What if a security researcher published a tool that could extract face embeddings from video clips and reverse-engineer the identities of enrolled people?"
+- "What if NovaMesh's insurance partner demanded that all auto-unlock events be audited in real-time by a third party?"
 
 ---
 
@@ -163,35 +163,36 @@ During presentations, other teams listen for:
 
 ## Residue Design Examples
 
-### Example Residue: AI Provider Independence
+### Example Residue: Face Recognition Provider Independence
 
-**Description**: A vendor-agnostic AI capability layer within the NovaMesh platform. All internal AI consumers interact with a common interface that specifies *what* is needed (intent, context, required capabilities) without binding to *how* it is delivered. The implementation can route to any AI provider, local model, or hybrid combination.
+**Description**: A vendor-agnostic facial recognition capability layer within the NovaMesh platform. All internal consumers (Access Rules Engine, Notification Service) interact with a recognition interface that specifies *what* is needed (face embedding, match result, confidence score) without binding to *how* it is delivered. The implementation can route to AWS Rekognition (external), the internal MobileFaceNet cloud model, or the on-device edge model based on availability, tier entitlement, and regulatory constraints.
 
 **Addresses**:
-- S-TECH-01 (OpenAI API breaking change) — only the router implementation changes, not all consumers
-- S-TECH-02 (OpenAI extended outage) — automatic fallback to Anthropic or internal models
-- S-REG-05 (Financial services data restriction) — data can be routed to on-premise or region-specific providers per regulatory constraint
-- S-REP-03 (AI privacy violation) — logging and data retention controlled at the abstraction layer
+- S-TECH-01 (Rekognition API breaking change) — only the router implementation changes, not all consumers
+- S-TECH-02 (Rekognition extended outage) — automatic fallback to internal model or edge model
+- S-REG-04 (Facial recognition prohibition) — geo-routing can disable cloud recognition for specific jurisdictions
+- S-REP-03 (Unauthorised surveillance) — data processing location controlled at the abstraction layer
 
-**Resists**: Attractor A2 (AI Vendor Capture)
+**Resists**: Attractor A2 (Face Recognition Vendor Capture), Attractor A5 (Biometric Privacy Collapse — gives pathway to edge-only mode without rebuilding consumers)
 
-**What Survives**: If OpenAI experiences an extended outage, the AI Assistant continues functioning via the Anthropic fallback; the response format is identical; function calling is available through a provider-neutral schema. The residue — the abstraction layer interface and routing logic — survives unchanged.
+**What Survives**: If AWS Rekognition experiences an outage, the Facial Recognition Engine routes cloud requests to the internal model; auto-unlock rules continue firing for Protect tier customers via cloud fallback, and for Insights/Premium customers via edge. The residue — the recognition interface specification and routing logic — survives unchanged regardless of which provider is active.
 
 ---
 
-### Example Residue: Edge-First Degraded Mode
+### Example Residue: Edge-First Recognition Mode
 
-**Description**: A capability where the NovaMesh Hub can maintain defined "core functionality" without cloud connectivity for an extended period (target: 72 hours). Core functionality is defined as: local AI inference for anomaly detection, stored automation rules execution, and local network management. Non-core features (AI Assistant, remote access) degrade gracefully with user notification.
+**Description**: A capability where the NovaDoor can perform facial recognition and execute auto-unlock rules entirely on-device, without requiring cloud connectivity. This is not just a "degraded mode" — it is the primary recognition path for Insights/Premium tier customers, with cloud recognition used only for model improvement feedback and complex cases. The on-device model, rule store, and lock control are self-sufficient for the core product use case.
 
 **Addresses**:
-- S-ENV-01 (Cloud region outage) — devices continue operating in local mode
-- S-ENV-02 (ISP outage) — loss of internet does not mean loss of home protection
-- S-TECH-07 (Auth0 outage) — local tokens allow continued device-level operation
-- S-REG-03 (IoT security mandate) — local security processing meets on-device requirements
+- S-ENV-01 (Cloud region outage) — auto-unlock continues working locally
+- S-ENV-02 (ISP outage) — loss of internet does not mean loss of door recognition
+- S-TECH-02 (Rekognition outage) — core recognition path is unaffected
+- S-TECH-07 (Auth0 outage) — door continues operating without authentication round-trips
+- S-REG-04 (Facial recognition prohibition) — edge-only mode processes no biometric data in the cloud
 
-**Resists**: Attractor A2 (AI Vendor Capture — reduces reliance on cloud AI), Attractor A5 (Privacy Collapse — processing stays local)
+**Resists**: Attractor A2 (Face Recognition Vendor Capture — reduces structural dependency on any cloud provider), Attractor A5 (Biometric Privacy Collapse — privacy-by-design positioning as product strength)
 
-**What Survives**: If internet connectivity is lost for 72 hours, all configured automations continue executing, anomaly detection continues locally, and the customer's home network continues functioning. The residue — the local rule engine and edge AI inference capability — survives independently of the cloud.
+**What Survives**: If internet connectivity is lost indefinitely, enrolled household members can still auto-unlock their door, motion detection continues, and local access rules execute. The residue — the on-device recognition model, cached rule store, and local lock control — survives independently of the cloud. Non-core features (app notifications, remote unlock, visitor history sync) degrade gracefully with user notification.
 
 ---
 
