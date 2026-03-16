@@ -39,12 +39,12 @@ Use the following components (matching the Component Catalogue):
 | C6 | Subscription & Billing Service | MIGRATING |
 | C7 | E-Commerce (Shopify) | LIVE (EXTERNAL) |
 | C8 | AI Orchestration Service | IN-BUILD |
-| C9 | Anomaly Detection Engine | IN-BUILD |
-| C10 | Predictive Maintenance Engine | IN-BUILD |
-| C11 | AI Assistant | IN-BUILD |
+| C9 | Facial Recognition Engine | IN-BUILD |
+| C10 | Visitor Intelligence Engine | IN-BUILD |
+| C11 | Access Rules Engine | IN-BUILD |
 | C12 | Support Chatbot | IN-BUILD |
 | C13 | Data Platform | IN-BUILD |
-| C14 | Edge AI Runtime (Hub Firmware) | LIVE |
+| C14 | Edge AI Runtime (NovaDoor Firmware) | LIVE |
 | C15 | Marketing & CRM | LIVE (EXTERNAL) |
 | C16 | Observability & Operations | LIVE |
 
@@ -144,8 +144,9 @@ For each such pair:
 - "Is this coupling through shared data? Shared vendor? Shared regulatory requirement? Shared customer trust?"
 
 Name each discovered coupling. Examples:
-- "Notification Service and Monolith are coupled through *database co-location*"
-- "AI Assistant and Support Chatbot are coupled through *vendor concentration* (both depend on OpenAI)"
+- "Notification Service and Monolith are coupled through *database co-location* (notification preferences in monolith DB)"
+- "Facial Recognition Engine and Access Rules Engine are coupled through *recognition result dependency* — a recognition outage disables auto-unlock even though the two components are nominally separate"
+- "Access Rules Engine and Device Management are coupled through *lock command dependency* — a billing entitlement failure (subscription downgrade) can silently disable access rules, preventing lock commands from being issued"
 
 ---
 

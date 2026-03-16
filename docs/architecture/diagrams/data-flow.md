@@ -1,200 +1,240 @@
 # Data Flow Diagrams
 
-This document shows how data moves through the NovaMesh platform for key scenarios.
+Six key data flows across the NovaMesh platform, covering the most architecturally significant paths.
 
 ---
 
-## Flow 1: Device Telemetry → AI Anomaly Detection → Alert
+## Flow 1: Visitor Detection → Face Recognition → Alert
 
-This is the primary real-time data flow driving NovaMesh's AI security feature.
-
-```mermaid
-sequenceDiagram
-    participant Hub as NovaMesh Hub<br/>(Edge Device)
-    participant IoT as AWS IoT Core<br/>(MQTT Broker)
-    participant Kafka as Kafka (MSK)<br/>(Event Bus)
-    participant Anomaly as Anomaly Detection<br/>Engine
-    participant DataLake as Data Lake<br/>(S3 + Glue)
-    participant Notify as Notification<br/>Service
-    participant FCM as Firebase FCM
-    participant App as Customer<br/>Mobile App
-
-    Hub->>IoT: Telemetry event (MQTT/TLS)<br/>network stats, device health, traffic patterns
-    IoT->>Kafka: IoT Rule → Kafka topic: device.telemetry
-    Kafka->>Anomaly: Stream consumer reads telemetry batch
-    Kafka->>DataLake: S3 Sink Connector → raw telemetry stored
-
-    Note over Anomaly: Run ensemble inference:<br/>Isolation Forest + LSTM
-
-    alt Anomaly Detected
-        Anomaly->>Notify: Publish anomaly alert event<br/>(SNS topic: alerts.anomaly)
-        Notify->>FCM: Push notification request
-        FCM->>App: "Unusual network activity detected<br/>on your NovaMesh Hub"
-    else No Anomaly
-        Anomaly->>DataLake: Write inference result (normal)
-    end
-
-    Note over DataLake: Weekly batch retraining<br/>triggered manually
-```
-
----
-
-## Flow 2: Hardware Purchase → Subscription Activation
-
-The post-purchase flow that onboards new hardware customers into the subscription platform.
+The primary product flow: a visitor arrives, the NovaDoor detects them, recognition runs, and the homeowner is notified.
 
 ```mermaid
 sequenceDiagram
-    participant Customer as Customer
-    participant Shopify as Shopify<br/>(E-Commerce)
-    participant StripeExt as Stripe<br/>(via Shopify)
-    participant APIGW as API Gateway
-    participant SubSvc as Subscription<br/>Service
-    participant MonolithDB as Monolith DB<br/>(dual-write target)
-    participant BillingDB as Billing DB
-    participant Notify as Notification<br/>Service
-    participant SendGrid as SendGrid
-
-    Customer->>Shopify: Place hardware order
-    Shopify->>StripeExt: Process payment
-    StripeExt-->>Shopify: Payment confirmed
-    Shopify->>APIGW: POST /webhooks/shopify/order-paid
-    APIGW->>SubSvc: Route webhook
-    SubSvc->>BillingDB: Create trial subscription record
-    SubSvc->>MonolithDB: Dual-write subscription (migration period)
-
-    Note over SubSvc,MonolithDB: ⚠️ Risk: if either write fails,<br/>subscription state becomes inconsistent
-
-    SubSvc->>Notify: Publish event: subscription.trial.created
-    Notify->>SendGrid: Send welcome email with app download link
-    SendGrid-->>Customer: "Welcome to NovaMesh!"
-
-    Note over Customer: Customer downloads app,<br/>provisions Hub via Bluetooth
-```
-
----
-
-## Flow 3: User Authentication & Feature Entitlement Check
-
-```mermaid
-sequenceDiagram
-    participant App as Web / Mobile App
-    participant APIGW as API Gateway<br/>(Lambda Auth)
-    participant Identity as Identity<br/>Service
-    participant Auth0 as Auth0<br/>(IdP)
-    participant SubSvc as Subscription<br/>Service
-    participant AIOrch as AI Orchestration<br/>Service
-
-    App->>APIGW: Request to /api/v2/ai/assistant<br/>(Bearer token)
-    APIGW->>Identity: Validate JWT (Lambda Authoriser)
-    Identity->>Auth0: Verify token signature
-    Auth0-->>Identity: Token valid, claims returned
-    Identity-->>APIGW: Principal: {user_id, org_id, roles}
-
-    APIGW->>AIOrch: Forward request + principal context
-    AIOrch->>SubSvc: GET /entitlements/{user_id}?feature=ai_assistant
-    SubSvc-->>AIOrch: {entitled: true, tier: "insights"}
-
-    Note over AIOrch: User on "Insights" tier<br/>✓ AI Assistant enabled
-
-    AIOrch->>AIOrch: Route to OpenAI GPT-4o
-    AIOrch-->>App: AI Assistant response
-```
-
----
-
-## Flow 4: OTA Firmware Update
-
-```mermaid
-sequenceDiagram
-    participant Engineer as NovaMesh<br/>Engineer
-    participant CI as GitHub Actions<br/>CI/CD
-    participant S3 as S3<br/>(Firmware Artefacts)
-    participant DeviceSvc as Device Management<br/>Service
+    participant Door as NovaDoor Firmware
     participant IoT as AWS IoT Core
-    participant Hub as NovaMesh Hub<br/>(Target Device)
-    participant Shadow as IoT Device Shadow
+    participant DevMgmt as Device Management
+    participant Kafka as Kafka (MSK)
+    participant FaceRecog as Facial Recognition Engine
+    participant FacesDB as Face Embedding Store
+    participant Rekognition as AWS Rekognition
+    participant AccessRules as Access Rules Engine
+    participant Notif as Notification Service
+    participant FCM as Firebase FCM
+    participant Mobile as Consumer Mobile App
 
-    Engineer->>CI: Merge firmware PR → tag release
-    CI->>S3: Upload signed firmware binary
-    CI->>DeviceSvc: POST /firmware/releases (version, S3 url, target criteria)
-    DeviceSvc->>DeviceSvc: Select target devices (firmware version criteria)
-    DeviceSvc->>IoT: Publish OTA job to target fleet
+    Door->>Door: Motion detected → person classifier fires
+    Door->>IoT: Publish visitor event (face frame, timestamp, device ID)
+    IoT->>DevMgmt: Forwards device message
+    DevMgmt->>Kafka: Publish visitor_event topic
 
-    loop For each target Hub
-        IoT->>Hub: Deliver OTA job notification (MQTT)
-        Hub->>S3: Download firmware binary (HTTPS)
-        Hub->>Hub: Verify signature, flash firmware
-        alt Update Success
-            Hub->>Shadow: Update shadow: {firmware_version: "2.4.1"}
-            Shadow->>DeviceSvc: Shadow update event → mark device updated
-        else Update Failed (~3-5% of attempts)
-            Hub->>Shadow: Report error state
-            Note over DeviceSvc: ⚠️ Manual intervention required<br/>No automated rollback
+    Kafka->>FaceRecog: Consume visitor_event
+
+    alt Privacy mode (Insights/Premium — edge recognition)
+        Door->>Door: MobileFaceNet runs on-device
+        Door->>IoT: Publish recognition_result (identity, confidence)
+        IoT->>FaceRecog: Recognition result (no face frame sent to cloud)
+    else Cloud mode (Free/Protect)
+        FaceRecog->>FacesDB: Load enrolled embeddings for household
+        FaceRecog->>Rekognition: Submit face frame for recognition
+        Rekognition-->>FaceRecog: Match result (identity ID or "Unknown")
+    end
+
+    FaceRecog->>Kafka: Publish recognition_result (identity, confidence, door ID)
+
+    par Access rule evaluation
+        Kafka->>AccessRules: Consume recognition_result
+        AccessRules->>AccessRules: Evaluate rules for this household + identity
+        alt Enrolled face with auto-unlock rule
+            AccessRules->>DevMgmt: Issue unlock command
+            DevMgmt->>IoT: Publish lock command to device shadow
+            IoT->>Door: Unlock command
+            Door->>Door: Electronic lock opens
         end
+    and Visitor notification
+        Kafka->>Notif: Consume recognition_result
+        Notif->>Notif: Build alert: name/Unknown, video thumbnail, unlock action
+        Notif->>FCM: Send push notification
+        FCM->>Mobile: "Alice is at your door" (or "Unknown visitor")
+        Mobile->>Mobile: Display alert with video thumbnail + unlock button
     end
 ```
 
 ---
 
-## Flow 5: AI Assistant — Natural Language Home Control
+## Flow 2: Face Enrollment
+
+How a household member adds a new recognised face to the system.
 
 ```mermaid
 sequenceDiagram
-    participant User as User
-    participant App as Mobile App
-    participant APIGW as API Gateway
-    participant AIOrch as AI Orchestration<br/>Service
-    participant OpenAI as OpenAI API<br/>(GPT-4o)
-    participant DeviceSvc as Device Management<br/>Service
-    participant Hub as NovaMesh Hub
+    participant User as Consumer (Mobile App)
+    participant API as API Gateway
+    participant Identity as Identity Service
+    participant FaceRecog as Facial Recognition Engine
+    participant FacesDB as Face Embedding Store
+    participant Subscription as Subscription Service
 
-    User->>App: "Turn off all lights at 10pm on weekdays"
-    App->>APIGW: POST /api/v2/ai/assistant/chat
-    APIGW->>AIOrch: Forward request
-    AIOrch->>OpenAI: Chat completion with function definitions<br/>(device_command, schedule_automation)
+    User->>API: POST /faces/enroll {name, photos: [frame1, frame2, frame3]}
+    API->>API: Validate JWT token
+    API->>Subscription: Check entitlement: can this household enroll another face?
+    Subscription-->>API: Entitlement result (e.g., Free tier: blocked; Protect: check count ≤ 10)
 
-    Note over OpenAI: Interprets intent,<br/>generates function call
-
-    OpenAI-->>AIOrch: function_call: schedule_automation<br/>{days: [Mon-Fri], time: "22:00", action: "lights_off"}
-    AIOrch->>DeviceSvc: POST /devices/{home_id}/automations
-    DeviceSvc->>Hub: Deliver automation config (MQTT)
-    Hub-->>DeviceSvc: Automation saved ACK
-
-    AIOrch-->>App: "Done! I've set all lights to turn off at 10pm on weekdays."
-    App-->>User: Display confirmation
-
-    Note over AIOrch,OpenAI: ⚠️ No abstraction layer between<br/>AIOrch and OpenAI — direct dependency
+    alt Over enrollment limit for tier
+        API-->>User: 403 Enrollment limit reached — upgrade to Insights
+    else Within limit
+        API->>FaceRecog: Enroll face {household_id, name, frames}
+        FaceRecog->>FaceRecog: Extract embeddings from frames
+        FaceRecog->>FaceRecog: Quality check (blur, occlusion, lighting)
+        FaceRecog->>FacesDB: Store face embeddings + name + household_id
+        FaceRecog->>Identity: Update face profile metadata (face_id, name)
+        FaceRecog-->>API: Enrollment result {face_id, quality_score}
+        API-->>User: 200 Face enrolled — Alice added to your household
+    end
 ```
 
 ---
 
-## Flow 6: GDPR Data Deletion Request (Current State — Manual & Fragmented)
+## Flow 3: Hardware Purchase → Subscription Activation
 
-This flow illustrates a current **architectural gap** that is particularly relevant for stressor analysis.
+How buying a NovaDoor hardware unit activates a subscription trial.
+
+```mermaid
+sequenceDiagram
+    participant Customer as Customer (Browser)
+    participant Shopify as Shopify Store
+    participant Stripe as Stripe
+    participant API as NovaMesh API Gateway
+    participant SubSvc as Subscription Service
+    participant Monolith as Legacy Monolith
+    participant Notif as Notification Service
+
+    Customer->>Shopify: Place order (NovaDoor hardware)
+    Shopify->>Stripe: Process payment
+    Stripe-->>Shopify: Payment confirmed
+    Shopify->>API: POST /webhooks/shopify/order-complete {order_id, customer_email}
+    API->>SubSvc: Activate free trial {customer_email, hardware_serial}
+    SubSvc->>SubSvc: Create Subscription record (Free tier, 30-day Protect trial)
+    SubSvc->>Monolith: ⚠️ Dual-write subscription state (migration state)
+
+    alt Dual-write fails (monolith unreachable)
+        Note over SubSvc,Monolith: Subscription created in SubSvc DB<br/>but monolith DB is stale — inconsistency accumulates
+    end
+
+    SubSvc->>Notif: Trigger welcome notification
+    Notif->>Notif: Read preferences from... monolith DB or cache?
+    Note over Notif: ⚠️ Preferences inconsistency — may use wrong channel
+    Notif-->>Customer: Welcome email / push notification
+```
+
+---
+
+## Flow 4: Remote Door Unlock
+
+How a homeowner unlocks their door remotely from the mobile app.
+
+```mermaid
+sequenceDiagram
+    participant User as Consumer (Mobile)
+    participant API as API Gateway
+    participant Identity as Identity Service
+    participant Subscription as Subscription Service
+    participant DevMgmt as Device Management
+    participant IoT as AWS IoT Core
+    participant Door as NovaDoor Firmware
+
+    User->>API: POST /doors/{door_id}/unlock
+    API->>Identity: Validate JWT; check RBAC (is user authorised for this door?)
+    Identity-->>API: Authorised
+    API->>Subscription: Check entitlement (remote unlock available on Protect+ only)
+    Subscription-->>API: Entitlement granted
+
+    API->>DevMgmt: Issue unlock command {door_id, user_id, timestamp}
+    DevMgmt->>IoT: Publish to device shadow: desired lock_state = unlocked
+    IoT->>Door: Deliver lock command via MQTT
+
+    alt Device online
+        Door->>Door: Actuate electronic lock — door unlocks
+        Door->>IoT: Report lock_state = unlocked (acknowledged)
+        IoT->>DevMgmt: State sync — confirmed unlock
+        DevMgmt-->>API: Unlock confirmed
+        API-->>User: Door unlocked ✓
+    else Device offline (cloud unreachable from device side)
+        Note over IoT,Door: Command queued in device shadow<br/>Lock actuates when device reconnects
+        API-->>User: Command sent — will execute when device reconnects
+    end
+```
+
+---
+
+## Flow 5: OTA Firmware Update
+
+How a firmware update reaches NovaDoor devices in the field. Note the safety implications given the door lock component.
+
+```mermaid
+sequenceDiagram
+    participant Engineer as NovaMesh Engineer
+    participant S3 as S3 (Firmware Artefacts)
+    participant DevMgmt as Device Management
+    participant IoT as AWS IoT Core
+    participant Door as NovaDoor Firmware
+
+    Engineer->>S3: Upload firmware v2.x.x (signed binary)
+    Engineer->>DevMgmt: POST /ota/campaigns {version, target_devices, rollout_pct: 5%}
+    Note over DevMgmt: Canary rollout: 5% of fleet first
+
+    DevMgmt->>IoT: Publish OTA job to target devices
+    IoT->>Door: Notify: new firmware available {download_url, checksum}
+    Door->>S3: Download firmware (HTTPS, signed URL)
+    Door->>Door: Verify signature + checksum
+    Door->>Door: Apply firmware update
+    Door->>Door: Reboot...
+
+    alt Update succeeds
+        Door->>IoT: Report firmware_version = v2.x.x (online)
+        IoT->>DevMgmt: State sync — update confirmed
+        DevMgmt->>DevMgmt: Increment success counter; check threshold before expanding rollout
+    else Update fails (3–5% of devices)
+        Door->>Door: ⚠️ Boot loop or failed verification
+        Note over Door: Door lock may be in unknown state
+        Door->>IoT: Offline (no heartbeat)
+        Note over DevMgmt: ⚠️ No automated rollback<br/>Manual SSH intervention required<br/>Lock state unknown until recovered
+        DevMgmt->>DevMgmt: Alert on-call engineer
+    end
+```
+
+---
+
+## Flow 6: Biometric Data Deletion Request (GDPR / BIPA)
+
+The current (fragmented) process for handling a user's request to delete their biometric and personal data — illustrating the data governance gap.
 
 ```mermaid
 flowchart TD
-    A[Customer submits<br/>GDPR deletion request] --> B[Support Agent<br/>receives in Zendesk]
-    B --> C{Manual triage}
-    C --> D[Delete from Identity Service DB]
-    C --> E[Delete from Monolith DB]
-    C --> F[Delete from Billing DB]
-    C --> G[Request HubSpot deletion<br/>manually]
-    C --> H[Request Customer.io<br/>deletion manually]
-    C --> I[Notify Zendesk to anonymise<br/>ticket data]
-    C --> J[Data Lake — no deletion<br/>capability yet]
-    C --> K[Snowflake — no deletion<br/>capability yet]
+    Request["User submits data deletion request\n(GDPR right to erasure / BIPA deletion)"] --> Ticket["Support ticket created in Zendesk"]
+    Ticket --> Manual["⚠️ Manual process begins\n(no automated deletion pipeline)"]
 
-    D & E & F & G & H & I --> L{All confirmed?}
-    J & K --> M[⚠️ Data remains in<br/>Data Lake & Warehouse<br/>indefinitely]
-    L -->|Sometimes| N[Close Zendesk ticket]
-    L -->|Often| O[⚠️ Partial deletion only<br/>some systems missed]
+    Manual --> Step1["Identity Service:\nDeactivate account + delete user profile"]
+    Manual --> Step2["Subscription Service:\nCancel subscription + billing history"]
+    Manual --> Step3["Notification Service:\n⚠️ Preferences still in monolith DB\n— requires separate monolith access"]
+    Manual --> Step4["Facial Recognition Engine:\nDelete enrolled face embeddings from novamesh-faces-db\n⚠️ No automated deletion API yet"]
+    Manual --> Step5["Video Storage:\nDelete all video clips from S3 for this household\n⚠️ Automated if lifecycle policy configured;\nmay miss clips uploaded before policy"]
+    Manual --> Step6["Data Platform / Data Lake:\n⚠️ Face frames in Kafka topic backlog\nand S3 archive — no deletion capability\nwithout full re-partitioning"]
+    Manual --> Step7["Recognition Audit Log:\n⚠️ Immutable by design — cannot delete\nspecific user's recognition events"]
+    Manual --> Step8["AWS Rekognition:\n⚠️ Face data sent to Rekognition for cloud recognition\n— deletion request must be filed separately with AWS"]
+    Manual --> Step9["Marketing CRM:\nRequest sent to HubSpot + Customer.io\n⚠️ BIPA consent not tracked in CRM"]
 
-    style M fill:#ff9999
-    style O fill:#ff9999
-    style J fill:#ffcccc
-    style K fill:#ffcccc
+    Step1 & Step2 & Step3 & Step4 & Step5 & Step6 & Step7 & Step8 & Step9 --> Verify["⚠️ Engineer manually verifies each step\n— no automated audit trail of deletion"]
+
+    Verify --> Report["Confirmation sent to user\n(target: 72hrs for GDPR;\nIllinois BIPA requires 30 days)"]
+
+    style Manual fill:#ffdddd,stroke:#cc0000
+    style Step3 fill:#ffeecc,stroke:#cc8800
+    style Step4 fill:#ffeecc,stroke:#cc8800
+    style Step6 fill:#ffeecc,stroke:#cc8800
+    style Step7 fill:#ffeecc,stroke:#cc8800
+    style Step8 fill:#ffeecc,stroke:#cc8800
+    style Step9 fill:#ffeecc,stroke:#cc8800
+    style Verify fill:#ffdddd,stroke:#cc0000
 ```
 
-> This flow is a significant regulatory risk. A single automation service and event-driven deletion pipeline is on the roadmap but not yet designed.
+**Key observation**: The biometric deletion problem is significantly more complex than standard PII deletion. Face embeddings may exist in: the face embedding store (C13), the Kafka topic backlog (C13), S3 archives (C13), AWS Rekognition's own storage (external), and the recognition audit log (C13). There is currently no single service that can answer: "has all biometric data for this user been deleted?"
