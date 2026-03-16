@@ -23,10 +23,10 @@ A reference catalogue of all technologies used across the NovaMesh platform.
 
 | Language | Used For |
 |---|---|
-| Go 1.22 | Identity Service, Device Management Service |
-| Python 3.12 | AI/ML services (Facial Recognition, Visitor Intelligence, Access Rules), Data Platform, Support Chatbot |
-| Python 3.11 / Django 4.2 | Legacy Monolith |
-| Node.js 20 | Subscription Service, Notification Service |
+| Go 1.22 | Identity Service (C3), Device Management Service (C4) |
+| Python 3.12 | AI services (Facial Recognition C5, Access Rules Engine C6) |
+| Python 3.11 / Django 4.2 | Legacy Monolith (C2) |
+| Node.js 20 | Notification Service (C7) |
 | TypeScript / React | Web Application (including access rules configuration UI) |
 | React Native | iOS and Android mobile apps |
 | C / Embedded Linux | NovaDoor firmware |
@@ -37,12 +37,11 @@ A reference catalogue of all technologies used across the NovaMesh platform.
 
 | Technology | Used By | Notes |
 |---|---|---|
-| PostgreSQL 15 | Identity Service, Subscription Service, Monolith, AI Orchestration | RDS managed instances |
-| PostgreSQL 15 + pgvector | Facial Recognition Engine (`novamesh-faces-db`) | Stores enrolled face embeddings; biometric data — strict access controls required |
-| DynamoDB | Device Management Service | NoSQL; hot-partition risk during mass OTA |
-| Redis | Notification Service (queue), API Gateway (rate limiting), AI Orchestration (cache) | ElastiCache |
+| PostgreSQL 15 | Identity Service (C3), Monolith (C2), Access Rules Engine (C6) | RDS managed instances |
+| PostgreSQL 15 + pgvector | Data Store (C8 — `novamesh-faces-db`) | Stores enrolled face embeddings; biometric data — strict access controls required |
+| DynamoDB | Device Management Service (C4) | NoSQL; hot-partition risk during mass OTA |
+| Redis | Notification Service (C7 — queue and deduplication) | ElastiCache |
 | S3 | Data Lake, firmware artefacts, ML model artefacts, **video clip storage** (per-household, encrypted, tiered retention) | |
-| Pinecone | Support Chatbot | Vector database for RAG |
 | Snowflake | Data Warehouse | Being set up |
 
 ---
@@ -67,13 +66,9 @@ A reference catalogue of all technologies used across the NovaMesh platform.
 | AWS Rekognition | Facial recognition (cloud mode, current default) | External dependency; no internal abstraction layer — critical risk |
 | MobileFaceNet (TFLite) | On-device face recognition (privacy mode, Insights/Premium tier) | Quantised model; runs on NovaDoor embedded NPU |
 | MobileFaceNet (PyTorch) | Cloud facial recognition (internal model, in development) | Internal model being developed to replace AWS Rekognition dependency |
-| YOLOv8 | Visitor Intelligence Engine — package detection, person classification | Object detection on visitor frames |
-| TensorFlow Lite | Edge AI runtime on NovaDoor firmware | Person detection, on-device face recognition |
-| PyTorch | Internal ML model training (face recognition, visitor intelligence) | Training infrastructure on EKS + GCP Vertex AI |
-| OpenAI Embeddings API | Support Chatbot (RAG embeddings) | `text-embedding-3-large` |
-| Pinecone | Vector store for Support Chatbot RAG | |
-| AWS Glue / Athena | Data cataloguing and query | Over S3 Data Lake |
-| Airbyte | ELT from SaaS sources | Shopify, HubSpot, Zendesk → Snowflake |
+| TensorFlow Lite | NovaDoor Firmware (C1) — person detection and on-device face recognition | Person detection, on-device face recognition |
+| PyTorch | Internal MobileFaceNet model training (in development) | Training infrastructure on EKS |
+| AWS Glue / Athena | Data Store (C8) — data cataloguing and query | Over S3 Data Lake |
 
 ---
 

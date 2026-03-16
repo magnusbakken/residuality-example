@@ -1,144 +1,53 @@
-# Exercise 3 — Attractor Analysis
+# Exercise 3 — Attractor Discussion
 
-**Duration**: 45 minutes  
-**Group size**: 4–6 per team  
-**Materials**: Attractors Analysis document, team's matrix output from Exercise 2
+**~20 minutes**
 
 ---
 
 ## Goal
 
-Identify which attractors the NovaMesh architecture is currently gravitating toward, understand which stressors accelerate each attractor, and explore whether any attractors are missing from the pre-built set.
+Identify which attractors the NovaMesh architecture is currently drifting toward, and see whether the matrix you built in Exercise 2 confirms, challenges, or extends the pre-built attractor analysis.
 
 ---
 
-## Background
+## What to Do
 
-In Residuality Theory, **attractors** are the stable states that a complex system gravitates toward when subject to accumulated stress. Rather than collapsing to a single stable state, complex systems can have multiple attractors — and a system can be moving toward more than one simultaneously.
-
-For software architecture:
-- An attractor is a *systemic drift* — not a single event, but a direction the architecture moves in as stressors accumulate and decisions compound
-- Attractors are not necessarily failures. A system in an attractor state can be functioning — just not in the way originally intended
-- Understanding attractors helps architects design residues that resist unhealthy attractors and stabilise around healthy ones
-
-Read the [Attractors Analysis](../../residuality-theory/attractors-analysis.md) document before starting this exercise.
-
----
-
-## The NovaMesh Attractors (Pre-Built)
+Read the [Attractors Analysis](../../residuality-theory/attractors-analysis.md) together, or at least the one-line descriptions of the three attractors:
 
 | ID | Name | Short Description |
 |---|---|---|
 | A1 | Monolith Resurrection | Microservices migration stalls; features flow back into the monolith |
-| A2 | Face Recognition Vendor Capture | All facial recognition becomes structurally dependent on AWS Rekognition; internal model abandoned; biometric data permanently third-party |
-| A3 | Enterprise Monoculture | Enterprise access control revenue dominates; consumer AI recognition stagnates; training data degrades |
-| A4 | Fragmented Microservices Swamp | 40+ services with unclear ownership; recognition pipeline has no end-to-end SLO; door safety guarantees impossible |
-| A5 | Biometric Privacy Collapse | Regulatory enforcement or breach forces data minimisation; recognition accuracy drops; auto-unlock cannot be offered safely |
+| A2 | Face Recognition Vendor Capture | All facial recognition structurally depends on AWS Rekognition; internal model abandoned; biometric data permanently third-party |
+| A3 | Biometric Privacy Collapse | Regulatory enforcement or reputational damage forces data minimisation; recognition accuracy drops; auto-unlock cannot be safely offered |
 
----
+Then discuss:
 
-## Instructions
+**1. Which attractor(s) does the incidence matrix point toward?**
 
-### Part A — Current State Assessment (15 minutes)
+Look at your highest-impact stressors and most vulnerable components. Do they cluster around one of the three attractors? If S-TECH-01 and S-ORG-01 both came in at the same time, what would happen?
 
-For each attractor, the team votes on one question:
+**2. Where are you placing your stressors?**
 
-**"On a scale of 1–5, how strongly is the NovaMesh architecture currently drifting toward this attractor?"**
+For each stressor in your working set, ask: if this stressor arrived, which attractor would it push the system toward? Some stressors push toward multiple attractors simultaneously — those are worth flagging.
 
-1 = No evidence of drift / actively resisted  
-3 = Some drift visible; could go either way  
-5 = Strong drift; architectural decisions are compounding toward this state
+**3. What's missing?**
 
-Use a simple show of hands or dot-voting. Record the team's average score for each attractor.
+The three attractors were identified through analysis. Are there drift patterns your matrix reveals that none of them describe? What would you call them?
 
-Then discuss (2–3 minutes per high-scoring attractor):
-- "What specific evidence from the current architecture supports this drift?"
-- "Is there any architectural decision or constraint that is *actively resisting* this attractor? Or is the system drifting unchecked?"
-
----
-
-### Part B — Stressor-to-Attractor Mapping (15 minutes)
-
-Take the team's **top 10 stressors** from Exercise 1.
-
-For each stressor, discuss: **"Which attractor(s) does this stressor accelerate, if it arrives?"**
-
-Place each stressor ID in one or more attractor "zones" on the whiteboard. Look for:
-- **Stressors that accelerate multiple attractors** — these are particularly dangerous because they compound the system's drift across multiple failure modes simultaneously
-- **Stressors that resist attractors** — (rare but worth finding) — are there stressors that would actually *push the system away* from an unhealthy attractor? (e.g., an OpenAI outage (S-TECH-02) might paradoxically push the team to invest in the AI abstraction layer that would resist Attractor A2)
-
-```
-╔═══════════════╗  ╔═══════════════╗  ╔═══════════════╗
-║  A1 Monolith  ║  ║  A2 AI Vendor ║  ║  A3 Enterprise║
-║  Resurrection ║  ║  Capture      ║  ║  Monoculture  ║
-║               ║  ║               ║  ║               ║
-║  Stressors:   ║  ║  Stressors:   ║  ║  Stressors:   ║
-║               ║  ║               ║  ║               ║
-╚═══════════════╝  ╚═══════════════╝  ╚═══════════════╝
-
-╔═══════════════╗  ╔═══════════════╗
-║  A4 Services  ║  ║  A5 Privacy   ║
-║  Swamp        ║  ║  Collapse     ║
-║               ║  ║               ║
-║  Stressors:   ║  ║  Stressors:   ║
-║               ║  ║               ║
-╚═══════════════╝  ╚═══════════════╝
-```
-
----
-
-### Part C — Missing Attractors (10 minutes)
-
-The five attractors in the pre-built set were identified by analysis of the NovaMesh architecture and stressor catalogue. But they may not be complete.
-
-As a team:
-1. Look at the stressor-to-attractor map you built in Part B
-2. Are there stressors that don't fit neatly into any of the five attractors?
-3. Are there patterns of drift in the architecture that none of the five attractors describe?
-
-For each missing attractor you identify:
-- Give it a name (descriptive, memorable)
-- Describe the stable state (what does the architecture/company look like if it settles here?)
-- Identify which stressors accelerate it
-- Note which existing attractor it is most similar to (or if it's genuinely novel)
-
-**Suggested prompts for finding missing attractors**:
+Some prompts for finding missing attractors:
 - "What would happen to NovaMesh if it grew 10x without changing its architecture?"
-- "What if NovaMesh ran out of money and had to operate with 40% of its current engineering team?"
-- "What if the founders left and the company was acquired by a private equity firm focused on cost extraction?"
-- "What if edge AI hardware improved so dramatically that cloud-based facial recognition became unnecessary — but NovaMesh's business model still requires cloud subscriptions?"
-- "What if a competitor or platform (e.g., Apple HomeKit) shipped a door lock standard that all hardware must comply with, removing NovaMesh's ability to differentiate on AI?"
-- "What if a series of high-profile false-accept incidents (a stranger auto-unlocked into a home) forced NovaMesh to disable auto-unlock company-wide until accuracy could be guaranteed?"
+- "What if a series of false-accept incidents forced NovaMesh to disable auto-unlock company-wide?"
+- "What if the founders left and the company was acquired by a PE firm focused on cost extraction?"
+
+**4. Attractors aren't always bad**
+
+Could any of the three attractors actually be a *better* outcome than the current trajectory under some conditions? For example: could Attractor A3 (forced edge-only recognition) actually become a competitive advantage if handled well?
 
 ---
 
-### Part D — Attractor Interaction (5 minutes)
+## Output
 
-Complex systems can move toward multiple attractors simultaneously. Some attractor pairs are reinforcing; others conflict.
-
-Quick discussion:
-- "Which two attractors, if NovaMesh entered both simultaneously, would be most damaging? (Hint: consider A2 + A5 — what happens to the product if both vendor capture AND biometric privacy collapse occur simultaneously?)"
-- "Are there any attractors that, if entered, would prevent the system from entering another? (Hint: could entering A5 (Biometric Privacy Collapse) actually prevent A2 (Vendor Capture) by forcing edge-only recognition?)"
-
----
-
-## Output for Exercise 4
-
-Record the following:
-
-1. **Attractor drift scores** (1–5 for each pre-built attractor)
-2. **Stressor-to-attractor map** (which stressors accelerate which attractors)
-3. **Any missing attractors** discovered by the team, with names and descriptions
-4. **The single most dangerous attractor** for NovaMesh right now, and the most important stressor driving it
-
-This becomes direct input to Exercise 4: the residues designed in Exercise 4 should specifically address the identified high-drift attractors.
-
----
-
-## Reflection Questions
-
-1. Were there any attractors that surprised the team? (Either that NovaMesh was drifting toward one you didn't expect, or *not* drifting toward one you expected)
-
-2. Attractors in Residuality Theory are not always "bad." Could any of the NovaMesh attractors actually represent a *better* outcome than the current architectural trajectory? Under what conditions?
-
-3. The attractors were identified through analysis. Are there attractors that would only be visible if you were *inside* the company as an employee? What would you need to know that isn't in the documentation to identify them?
+Before moving to Exercise 4:
+1. Which attractor is NovaMesh drifting toward most strongly, and why?
+2. Which stressors from your working set accelerate which attractors?
+3. Any new attractors the group identified

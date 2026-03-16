@@ -237,4 +237,4 @@ flowchart TD
     style Verify fill:#ffdddd,stroke:#cc0000
 ```
 
-**Key observation**: The biometric deletion problem is significantly more complex than standard PII deletion. Face embeddings may exist in: the face embedding store (C13), the Kafka topic backlog (C13), S3 archives (C13), AWS Rekognition's own storage (external), and the recognition audit log (C13). There is currently no single service that can answer: "has all biometric data for this user been deleted?"
+**Key observation**: The biometric deletion problem is significantly more complex than standard PII deletion. Face embeddings may exist in: the face embedding store (C8 — `novamesh-faces-db`), the Kafka topic backlog (C8), S3 archives (C8), AWS Rekognition's own storage (external), and the recognition audit log (C8). There is currently no single service that can answer: "has all biometric data for this user been deleted?"
