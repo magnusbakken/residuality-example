@@ -56,13 +56,11 @@ The component appears self-contained. The residue analysis reveals **three hidde
 
 Complex systems don't explore all possible states — they gravitate toward attractors. For software architecture, attractors are the stable configurations that the system naturally settles into when left to evolve under various pressures.
 
-The Residuality Theory workshop will explore **five attractors** for the NovaMesh architecture:
+The Residuality Theory workshop will explore **three attractors** for the NovaMesh architecture:
 
 - **A1 — Monolith Resurrection**: The microservices migration stalls; enterprise and AI features grow back into the monolith
 - **A2 — Face Recognition Vendor Capture**: Structural lock-in to AWS Rekognition; internal model development abandoned; biometric data permanently third-party
-- **A3 — Enterprise Monoculture**: Enterprise access control revenue dominates; consumer AI recognition stagnates
-- **A4 — Fragmented Microservices Swamp**: 40+ services with no governance; recognition pipeline has no end-to-end SLO; door safety guarantees impossible to make
-- **A5 — Biometric Privacy Collapse**: Regulatory enforcement or breach forces data minimisation; recognition accuracy drops; auto-unlock feature cannot be offered safely
+- **A3 — Biometric Privacy Collapse**: Regulatory enforcement or reputational damage forces data minimisation; recognition accuracy drops; auto-unlock feature cannot be offered safely
 
 Understanding these attractors helps explain *why* the system behaves the way it does under stress, and helps architects design residues that remain viable across multiple attractors.
 
@@ -82,14 +80,7 @@ This is already done: the [As-Is Architecture Overview](../architecture/as-is-ov
 
 The theory advocates for **random simulation of stressors** rather than systematic risk analysis. The reason: if you only analyse risks you can think of, you recreate the same blind spots that risk analysis has always had. Randomly introducing stressors — even implausible ones — forces the architecture to be examined from angles that systematic thinking would miss.
 
-The [Stressors Catalogue](./stressors-catalog.md) contains a starting set of stressors across six categories:
-
-1. Regulatory & Legal
-2. Competitive & Market
-3. Technical & Infrastructure
-4. Organisational & People
-5. Environmental & Physical
-6. Reputational & Social
+The [Stressors Catalogue](./stressors-catalog.md) contains a small set of example stressors to get the workshop started. These are deliberately not exhaustive — part of the value is generating your own. Categories to consider: regulatory, competitive, technical, organisational, environmental, and reputational.
 
 ### Phase 3: Build the Incidence Matrix
 
@@ -127,4 +118,4 @@ NovaMesh presents a rich set of conditions that make Residuality Theory analysis
 
 5. **AI vendor concentration**: The dependency on AWS Rekognition without an abstraction layer is an unusually high-risk coupling — particularly because biometric data crosses the boundary to a third party with every recognition request
 
-6. **Hidden hyperliminal coupling**: The Notification Service → Monolith DB dependency is a perfect example of the kind of coupling that Residuality Theory is uniquely positioned to surface. The recognition pipeline coupling (C9 → C11 → C3) is an even richer example because failure anywhere in the chain prevents auto-unlock — but each component has different owners and different stressor profiles.
+6. **Hidden hyperliminal coupling**: The Notification Service → Monolith DB dependency is a perfect example of the kind of coupling that Residuality Theory is uniquely positioned to surface. The recognition pipeline coupling (C5 → C6 → C4 → C1) is an even richer example because failure anywhere in the chain prevents auto-unlock — but each component has different owners and different stressor profiles.

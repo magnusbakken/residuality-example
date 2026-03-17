@@ -2,13 +2,13 @@
 
 This repository contains the architecture documentation and workshop materials for **NovaMesh**, a fictional smart door technology company used as a case study for exploring [Barry O'Reilly's Residuality Theory](https://leanpub.com/residuality).
 
-NovaMesh makes the **NovaDoor** — a smart door device with a built-in 4K camera, electronic lock, and AI-powered facial recognition. The device identifies visitors (enrolled household members, known guests, unknown strangers), automatically unlocks for recognised faces, and sends real-time alerts to the homeowner's mobile app. Optional enterprise features support multi-door building access control, visitor management, and compliance reporting.
+NovaMesh makes the **NovaDoor** — a smart door device with a built-in 4K camera, electronic lock, and AI-powered facial recognition. The device identifies visitors (enrolled household members, known guests, unknown strangers), automatically unlocks for recognised faces, and sends real-time alerts to the homeowner's mobile app.
 
 ## Purpose
 
-This demo is designed for architects, developers, and stakeholders who want to apply Residuality Theory techniques — specifically **stressor analysis**, **attractor mapping**, and **incidence matrices** — to a realistic, multi-domain software system. The NovaMesh architecture intentionally represents a company mid-transition: with legacy components, ongoing migrations, newly built microservices, and ambitious AI capabilities either in-flight or planned.
+This demo is designed for a small group of developers who want to get hands-on experience with Residuality Theory techniques — specifically stressor analysis, attractor mapping, and incidence matrices — applied to a realistic, multi-domain software system.
 
-NovaMesh is a particularly rich subject because it sits at the intersection of **physical hardware** (door locks), **biometric AI** (facial recognition), **real-time cloud infrastructure**, and **sensitive data regulation** (GDPR, BIPA) — creating unusual and non-obvious cross-domain stressor patterns.
+NovaMesh is a useful case study because it sits at the intersection of **physical hardware** (door locks), **biometric AI** (facial recognition), **real-time cloud infrastructure**, and **sensitive data regulation** (GDPR, BIPA) — creating non-obvious cross-domain stressor patterns.
 
 ## What is Residuality Theory?
 
@@ -19,11 +19,11 @@ Residuality Theory (Barry O'Reilly, 2024) is an approach to software architectur
 A **residue** is a unit of change — the part of the architecture that adapts or persists after a stressor impacts the system. The goal is **criticality**: a state where the existing residues can already handle most new stressors, even those you never anticipated.
 
 Key concepts:
-- **Stressors**: Unexpected or previously unknown events that impact the system (technical, regulatory, competitive, organisational, or environmental)
-- **Residues**: Architectural units designed to absorb or adapt to stress — alternatives to traditional "components"
-- **Attractors**: The small set of stable states a complex system gravitates toward, regardless of how many possible states exist
-- **Incidence Matrix**: A mapping tool that shows which stressors affect which residues/components, revealing hidden coupling and vulnerability hotspots
-- **Criticality**: The ideal architectural state where existing residues address stressors that were not explicitly designed for
+- **Stressors**: Unexpected events that impact the system — technical, regulatory, competitive, organisational, or environmental
+- **Residues**: Architectural units designed to absorb or adapt to stress
+- **Attractors**: The small set of stable states a complex system gravitates toward under accumulated pressure
+- **Incidence Matrix**: A mapping tool that reveals which stressors affect which components, surfacing hidden coupling and vulnerability hotspots
+- **Criticality**: The ideal state where existing residues address stressors that weren't explicitly designed for
 
 ## Repository Structure
 
@@ -31,8 +31,8 @@ Key concepts:
 docs/
 ├── company-profile.md              # NovaMesh background, products, strategy
 ├── architecture/
-│   ├── as-is-overview.md           # Current architecture narrative
-│   ├── component-descriptions.md   # Detailed component catalogue
+│   ├── as-is-overview.md           # Current architecture (8 components)
+│   ├── component-descriptions.md   # Component catalogue
 │   ├── technology-stack.md         # Technologies in use
 │   └── diagrams/
 │       ├── system-context.md       # C4 Level 1 — System context diagram
@@ -41,11 +41,11 @@ docs/
 │       └── domain-map.md           # Domain model / bounded contexts
 ├── residuality-theory/
 │   ├── overview.md                 # Residuality Theory concepts applied to NovaMesh
-│   ├── stressors-catalog.md        # Catalogue of external and internal stressors
-│   ├── attractors-analysis.md      # Attractor states for NovaMesh
-│   └── incidence-matrix.md         # Stressor × Residue incidence matrix
+│   ├── stressors-catalog.md        # Example stressors (starting point, not exhaustive)
+│   ├── attractors-analysis.md      # Three attractor states for NovaMesh
+│   └── incidence-matrix.md         # Pre-built stressor × component matrix
 └── workshop/
-    ├── facilitator-guide.md        # How to run the Residuality Theory workshop
+    ├── facilitator-guide.md        # Session guide (~2 hours, ~5 developers)
     └── exercises/
         ├── 01-stressor-identification.md
         ├── 02-incidence-matrix.md
@@ -55,24 +55,23 @@ docs/
 
 ## Getting Started
 
-1. Read the [Company Profile](docs/company-profile.md) to understand NovaMesh's context, products, and strategic situation.
-2. Review the [As-Is Architecture Overview](docs/architecture/as-is-overview.md) to understand the current system.
-3. Explore the [Architecture Diagrams](docs/architecture/diagrams/) for visual representations.
-4. Read the [Residuality Theory Overview](docs/residuality-theory/overview.md) for an introduction to the concepts as applied here.
-5. Use the [Workshop Facilitator Guide](docs/workshop/facilitator-guide.md) to run a structured session with your team.
+1. Read the [Company Profile](docs/company-profile.md) to understand NovaMesh's context and products.
+2. Review the [As-Is Architecture Overview](docs/architecture/as-is-overview.md) for a walkthrough of the eight core components.
+3. Read the [Residuality Theory Overview](docs/residuality-theory/overview.md) for a primer on the concepts.
+4. Use the [Workshop Guide](docs/workshop/facilitator-guide.md) to run a session with your group.
 
-## Recommended Workshop Flow
+## Suggested Session Flow
 
-| Session | Duration | Focus |
+| Step | Duration | Focus |
 |---|---|---|
-| 1 | 30 min | Company context & architecture walkthrough |
-| 2 | 45 min | Exercise 1 — Stressor identification |
-| 3 | 60 min | Exercise 2 — Building the incidence matrix |
-| 4 | 45 min | Exercise 3 — Attractor analysis |
-| 5 | 60 min | Exercise 4 — Residue redesign proposals |
-| 6 | 30 min | Debrief & synthesis |
+| 1 | 15 min | Context sync — walk through NovaMesh architecture together |
+| 2 | 20 min | [Exercise 1](docs/workshop/exercises/01-stressor-identification.md) — stressor selection |
+| 3 | 35 min | [Exercise 2](docs/workshop/exercises/02-incidence-matrix.md) — build the incidence matrix |
+| 4 | 20 min | [Exercise 3](docs/workshop/exercises/03-attractor-analysis.md) — attractor discussion |
+| 5 | 20 min | [Exercise 4](docs/workshop/exercises/04-residue-redesign.md) — sketch residues |
+| 6 | 10 min | Closing discussion — what's applicable to our actual work? |
 
-Total: approximately **4.5–5 hours** (full-day workshop with breaks)
+Total: approximately **2 hours**
 
 ## References
 
