@@ -77,7 +77,7 @@ sequenceDiagram
     User->>API: POST /faces/enroll {name, photos: [frame1, frame2, frame3]}
     API->>API: Validate JWT token
     API->>Subscription: Check entitlement: can this household enroll another face?
-    Subscription-->>API: Entitlement result (e.g., Free tier: blocked; Protect: check count ≤ 10)
+    Subscription-->>API: Entitlement result (e.g., Free tier: blocked, Protect: check count <= 10)
 
     alt Over enrollment limit for tier
         API-->>User: 403 Enrollment limit reached — upgrade to Insights
@@ -143,7 +143,7 @@ sequenceDiagram
     participant Door as NovaDoor Firmware
 
     User->>API: POST /doors/{door_id}/unlock
-    API->>Identity: Validate JWT; check RBAC (is user authorised for this door?)
+    API->>Identity: Validate JWT, check RBAC (is user authorised for this door?)
     Identity-->>API: Authorised
     API->>Subscription: Check entitlement (remote unlock available on Protect+ only)
     Subscription-->>API: Entitlement granted
@@ -192,8 +192,8 @@ sequenceDiagram
     alt Update succeeds
         Door->>IoT: Report firmware_version = v2.x.x (online)
         IoT->>DevMgmt: State sync — update confirmed
-        DevMgmt->>DevMgmt: Increment success counter; check threshold before expanding rollout
-    else Update fails (3–5% of devices)
+        DevMgmt->>DevMgmt: Increment success counter, check threshold before expanding rollout
+    else Update fails (3-5% of devices)
         Door->>Door: ⚠️ Boot loop or failed verification
         Note over Door: Door lock may be in unknown state
         Door->>IoT: Offline (no heartbeat)
